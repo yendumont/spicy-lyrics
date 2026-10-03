@@ -1,5 +1,5 @@
 import { isDev } from "../../components/Global/Defaults.ts";
-import { $currentLyricsData, $currentLyricsType, $currentlyFetching } from "../stores.ts";
+import { $currentLyricsData, $currentLyricsType, $currentlyFetching, $preferBestSync } from "../stores.ts";
 import Platform from "../../components/Global/Platform.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import PageView, { PageContainer } from "../../components/Pages/PageView.ts";
@@ -14,6 +14,14 @@ import { GetExpireStore } from "../../modules/Store.ts";
 import { SLObjPack } from "../objpack.ts";
 import { HideLyricsSkeleton, IsLyricsSkeletonEnabled, ShowLyricsSkeleton } from "./LyricsSkeleton.ts";
 import { onExperimentChange } from "../experiments.ts";
+import {
+  BEST_SYNC_RANK,
+  FetchFromExternalProviders,
+  GetProviderOrder,
+  SyncRank,
+  type ExternalProviderId,
+  type LyricsProviderId,
+} from "./providers/index.ts";
 
 const lyricsLogger = new Logger("Lyrics Pipeline");
 const lyricsCacheLogger = new Logger("Lyrics Cache");
@@ -252,8 +260,114 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
   /* const lyricsApi = storage.get("customLyricsApi") ?? Defaults.LyricsContent.api.url;
     const lyricsAccessToken = storage.get("lyricsApiAccessToken") ?? Defaults.LyricsContent.api.accessToken; */
 
+  let candidate: any | null = null;
+  let salvage: (() => Promise<[object | string, number] | null>) | null = null;
+
   try {
     let status = 0;
+
+    const order = GetProviderOrder();
+    const spicyIndex = order.indexOf("spicy");
+    const isExternal = (id: LyricsProviderId): id is ExternalProviderId => id !== "spicy";
+    const externalsBefore = (spicyIndex === -1 ? order : order.slice(0, spicyIndex)).filter(
+      isExternal
+    );
+    const externalsAfter = (spicyIndex === -1 ? [] : order.slice(spicyIndex + 1)).filter(
+      isExternal
+    );
+
+    /** Process, cache and present a payload; null if nothing renderable survives. */
+    const commitLyrics = async (lyrics: any): Promise<[object | string, number] | null> => {
+      await ProcessLyrics(lyrics);
+
+      // Pruning blank lines can empty out a payload the provider still counted
+      // as a hit. Nothing would render, so treat it as a miss rather than
+      // caching and publishing an empty lyrics card.
+      if (IsEmptyLyrics(lyrics)) {
+        lyricsLogger.warn("Lyrics payload had no renderable lines after pruning");
+        return null;
+      }
+
+      // Stamp the uri so every match downstream (saved-data, re-fetch, cache)
+      // keys off the stable uri instead of the API-supplied id.
+      lyrics.uri = uri;
+
+      // The request already completed, so cache it either way — even if the user
+      // has skipped on, the next play of this track gets a cache hit.
+      if (LyricsStore) {
+        try {
+          await LyricsStore.SetItem(trackId, lyrics);
+        } catch (error) {
+          lyricsCacheLogger.error("Error saving lyrics to cache", error);
+        }
+      }
+
+      if (isStaleFetch(uri)) return [{ ...lyrics, fromCache: false }, 200];
+
+      $currentLyricsData.set(JSON.stringify(lyrics));
+      presentLyrics(lyrics);
+      return [{ ...lyrics, fromCache: false }, 200];
+    };
+
+    const notFound = (): [string, number] => {
+      hideLoaderFor(uri);
+      $currentlyFetching.set(false);
+      return ["lyrics-not-found", 404];
+    };
+
+    // The best payload found so far, not yet committed. With "prefer best sync"
+    // off, any hit is final; with it on, only word-synced lyrics are, and a
+    // lesser hit waits while the remaining providers are asked for something better.
+    const preferBestSync = $preferBestSync.get();
+    const isFinal = (lyrics: any) => !preferBestSync || SyncRank(lyrics) >= BEST_SYNC_RANK;
+    const consider = (lyrics: any) => {
+      if (SyncRank(lyrics) > SyncRank(candidate)) candidate = lyrics;
+    };
+    const askExternals = async (ids: ExternalProviderId[]) =>
+      consider(
+        await FetchFromExternalProviders(
+          ids,
+          () => isStaleFetch(uri),
+          SyncRank(candidate),
+          preferBestSync
+        )
+      );
+
+    /**
+     * Wrap up: take `spicy` (if Spicy had lyrics) into account, ask the providers
+     * after it unless something final is already in hand, then commit the best
+     * candidate — or report that there are no lyrics.
+     */
+    const finish = async (spicy?: any): Promise<[object | string, number]> => {
+      consider(spicy);
+      if (!(candidate && isFinal(candidate))) await askExternals(externalsAfter);
+      if (candidate) {
+        const committed = await commitLyrics(candidate);
+        if (committed) return committed;
+        candidate = null;
+      }
+      return notFound();
+    };
+
+    // On a thrown error (breaker, network) a payload already in hand is still
+    // worth showing.
+    salvage = async () => {
+      if (!candidate) return null;
+      try {
+        return await commitLyrics(candidate);
+      } catch (error) {
+        lyricsLogger.warn("Could not show the lyrics already found", error);
+        return null;
+      }
+    };
+
+    await askExternals(externalsBefore);
+    if (candidate && isFinal(candidate)) {
+      const committed = await commitLyrics(candidate);
+      if (committed) return committed;
+      candidate = null;
+    }
+    if (spicyIndex === -1) return await finish();
 
     const runLyricsQuery = async (token: string) => {
       lyricsLogger.debug("API lyrics query", { trackId });
@@ -320,9 +434,7 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
 
     if (!lyricsQuery) {
       lyricsLogger.error("Lyrics query not found");
-      hideLoaderFor(uri);
-      $currentlyFetching.set(false);
-      return ["lyrics-not-found", 404];
+      return await finish();
     }
 
     status = lyricsQuery.httpStatus;
@@ -346,10 +458,10 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
 
     if (status !== 200) {
       if (status === 404) {
-        hideLoaderFor(uri);
-        $currentlyFetching.set(false);
-        return ["lyrics-not-found", 404];
+        return await finish();
       }
+      // A hiccup on Spicy's side must not throw away lyrics another provider already found.
+      if (candidate) return await finish();
       if (status === 429) {
         // The server's own per-query rate limit. (A *transport* 429 never gets
         // here — that trips the circuit breaker and throws.)
@@ -365,43 +477,16 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     const lyrics = lyricsPacker.unpack(lyricsQuery.data) as any;
 
     if (lyrics === null || lyrics === undefined || lyrics === "") {
-      hideLoaderFor(uri);
-      $currentlyFetching.set(false);
-      return ["lyrics-not-found", 404];
+      return await finish();
     }
 
-    await ProcessLyrics(lyrics);
-
-    // Pruning blank lines can empty out a payload the API still counted as a
-    // hit. Nothing would render, so treat it as a miss rather than caching and
-    // publishing an empty lyrics card.
-    if (IsEmptyLyrics(lyrics)) {
-      lyricsLogger.warn("Lyrics payload had no renderable lines after pruning");
-      hideLoaderFor(uri);
-      $currentlyFetching.set(false);
-      return ["lyrics-not-found", 404];
-    }
-
-    // Stamp the uri so every match downstream (saved-data, re-fetch, cache)
-    // keys off the stable uri instead of the API-supplied id.
-    lyrics.uri = uri;
-
-    // The request already completed, so cache it either way — even if the user
-    // has skipped on, the next play of this track gets a cache hit.
-    if (LyricsStore) {
-      try {
-        await LyricsStore.SetItem(trackId, lyrics);
-      } catch (error) {
-        lyricsCacheLogger.error("Error saving lyrics to cache", error);
-      }
-    }
-
-    if (isStaleFetch(uri)) return [{ ...lyrics, fromCache: false }, 200];
-
-    $currentLyricsData.set(JSON.stringify(lyrics));
-    presentLyrics(lyrics);
-    return [{ ...lyrics, fromCache: false }, 200];
+    return await finish(lyrics);
   } catch (error) {
+    if (salvage) {
+      const rescued = await salvage();
+      if (rescued) return rescued;
+    }
+
     $currentlyFetching.set(false);
     hideLoaderFor(uri);
 

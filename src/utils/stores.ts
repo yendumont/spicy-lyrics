@@ -60,6 +60,12 @@ export const $simpleLyricsModeRenderingType = persistAtom<string>(
   "calculate"
 );
 export const $minimalLyricsMode = persistAtom<boolean>("minimalLyricsMode", false);
+// Which source is asked for lyrics first: "spicy" | "unison" | "lrclib".
+export const $lyricsProvider = persistAtom<string>("lyricsProvider", "spicy");
+// When the chosen source has nothing, try the remaining ones in turn.
+export const $lyricsProviderFallback = persistAtom<boolean>("lyricsProviderFallback", true);
+// Keep asking providers past a worse-synced hit (word > line > unsynced) and show the best.
+export const $preferBestSync = persistAtom<boolean>("preferBestSync", true);
 // Tinted box drawn behind a lyrics line while the pointer is over it.
 export const $lineHoverBackground = persistAtom<boolean>("lineHoverBackground", true);
 export const $skipSpicyFont = persistAtom<boolean>("skipSpicyFont", false);

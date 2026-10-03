@@ -3,6 +3,8 @@ const ProviderMap = {
     "aml": "Apple Music",
     "spl": "Spicy Lyrics",
     "ldb": "Local DB",
+    "lrclib": "LRCLIB",
+    "unison": "Unison",
 } as const;
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {

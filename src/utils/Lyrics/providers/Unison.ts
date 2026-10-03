@@ -6,12 +6,15 @@ import type { TrackInfo } from "./types.ts";
 const logger = new Logger("Unison");
 
 const BASE = "https://unison.boidu.dev";
+// The Unison website; its /curator/<keyId> page redirects to /u/<handle> when one is set.
+const PROFILE_BASE = "https://unison.betterlyrics.org";
 const TIMEOUT_MS = 8000;
 
 type UnisonLyrics = {
   lyrics?: string;
   format?: "ttml" | "lrc" | "plain";
   hidden?: boolean;
+  submitter?: { keyId?: string; displayName?: string; avatarUrl?: string | null };
 };
 
 export async function fetchFromUnison(track: TrackInfo): Promise<any | null> {
@@ -42,5 +45,18 @@ export async function fetchFromUnison(track: TrackInfo): Promise<any | null> {
       logger.warn("Unknown Unison lyrics format", data.format);
   }
 
-  return parsed ? { ...parsed, source: "unison" } : null;
+  if (!parsed) return null;
+
+  const submitter = data.submitter;
+  const UnisonSubmitter = submitter?.displayName
+    ? {
+        name: submitter.displayName,
+        avatar: submitter.avatarUrl ?? undefined,
+        url: submitter.keyId
+          ? `${PROFILE_BASE}/curator/${encodeURIComponent(submitter.keyId)}`
+          : undefined,
+      }
+    : undefined;
+
+  return { ...parsed, source: "unison", UnisonSubmitter };
 }

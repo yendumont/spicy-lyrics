@@ -1,5 +1,6 @@
 import { createTooltip } from "../../../tooltip.ts";
 import { IsPIP } from "../../../../components/Utils/PopupLyrics.ts";
+import { ApplyUnisonCredit } from "./ApplyUnisonCredit.ts";
 
 let isByCommunityAbortController: AbortController | null = null;
 let madeTippys = new Set<any>();
@@ -26,6 +27,10 @@ function openProfile(userId: string | undefined) {
 
 export function ApplyIsByCommunity(data: any, LyricsContainer: HTMLElement): void {
   if (!data.source || !LyricsContainer) return;
+  if (data.source === "unison") {
+    ApplyUnisonCredit(data, LyricsContainer);
+    return;
+  }
   if (data.source !== "spl") return;
 
   // Clean up any previous listeners before adding new ones

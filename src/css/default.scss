@@ -154,13 +154,14 @@ body:has(#SpicyLyricsPage):not(:has(
   .playback-bar > .playback-progressbar-container {
     margin-left: calc(var(--playback-bar-grid-gap, 8px) + 50px);
   }
-  /* Builds whose progress wrapper lacks that class: pad the bar instead of
+  /* Builds whose progress wrapper lacks that class (newer Spotify builds mark it
+     with data-testid="playback-progressbar" and no .playback-progressbar class): pad the bar instead of
      targeting the wrapper. A selector ending in a bare :has() under this
      body:has() gate made Blink restyle the whole document on every DOM change. */
-  .playback-bar:has(> :not(.playback-progressbar-container) .playback-progressbar) {
+  .playback-bar:has(> :not(.playback-progressbar-container) :is(.playback-progressbar, [data-testid="playback-progressbar"])) {
     padding-left: calc(var(--playback-bar-grid-gap, 8px) + 50px);
   }
-  .playback-bar:has(> :not(.playback-progressbar-container) .playback-progressbar)
+  .playback-bar:has(> :not(.playback-progressbar-container) :is(.playback-progressbar, [data-testid="playback-progressbar"]))
     > :is(.playback-bar__progress-time-elapsed, [data-testid="playback-position"]) {
     left: 0;
   }

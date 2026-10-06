@@ -1,6 +1,6 @@
 # Runbook: running this fork next to (or instead of) official Spicy Lyrics
 
-This fork adds two lyrics providers (**LRCLIB**, **Unison**), provider fallback and a
+This fork adds four lyrics providers (**LRCLIB**, **Unison**, **NetEase**, **QQ Music**), provider fallback and a
 "Prefer Best Sync" mode. It installs into Spicetify as its **own extension**,
 `spicy-lyrics-providers.js`, so official Spicy Lyrics updates cannot overwrite it.
 
@@ -127,5 +127,5 @@ install script.
 
 - `scripts/install-spicetify.ps1`: build, install, register, apply (and `-Uninstall`).
 - `scripts/update-fork.ps1`: merge upstream, then call the install script.
-- `src/utils/Lyrics/providers/`: LRCLIB and Unison clients, LRC parsing, sync ranking.
+- `src/utils/Lyrics/providers/`: LRCLIB, Unison, NetEase and QQ Music clients (the last two use unofficial endpoints through `Spicetify.CosmosAsync`), LRC parsing, sync ranking.
 - `src/utils/Lyrics/fetchLyrics.ts`: provider order and fallback around the Spicy API call.

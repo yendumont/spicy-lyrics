@@ -5,6 +5,8 @@ const ProviderMap = {
     "ldb": "Local DB",
     "lrclib": "LRCLIB",
     "unison": "Unison",
+    "netease": "NetEase",
+    "qqmusic": "QQ Music",
 } as const;
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {

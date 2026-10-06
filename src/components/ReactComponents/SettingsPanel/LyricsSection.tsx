@@ -13,8 +13,8 @@ import { matches, Row, Select, SectionTitle, Toggle } from "./components.tsx";
 
 const SECTION_NAME = "Lyrics Display";
 const renderingTypeOptions = ["calculate", "animate"];
-const providerOptions = ["spicy", "unison", "lrclib"];
-const providerLabels = ["Spicy Lyrics", "Unison", "LRCLIB"];
+const providerOptions = ["spicy", "unison", "lrclib", "netease", "qqmusic"];
+const providerLabels = ["Spicy Lyrics", "Unison", "LRCLIB", "NetEase", "QQ Music"];
 
 interface Props {
   query: string;
@@ -36,7 +36,7 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const r2 = matches(query, "Simple Mode: Text Animation Style", "How lyrics text transitions are rendered in Simple Lyrics Mode.");
   const r3 = matches(query, "Minimal Lyrics Mode", "Hides sung lyrics lines in Fullscreen and Cinema Mode");
   const r4 = matches(query, "Line Hover Background", "Shows a highlight box behind a lyrics line when you hover over it");
-  const r5 = matches(query, "Lyrics Provider", "Which service lyrics are fetched from first: Spicy Lyrics, Unison or LRCLIB.");
+  const r5 = matches(query, "Lyrics Provider", "Which service lyrics are fetched from first: Spicy Lyrics, Unison, LRCLIB, NetEase or QQ Music.");
   const r6 = matches(query, "Provider Fallback", "When the chosen lyrics provider has nothing for a song, try the other providers in turn.");
 
   const r7 = matches(query, "Prefer Best Sync", "Keep asking providers past a worse-synced result and show the best one: word sync over line sync over unsynced.");

@@ -25,8 +25,20 @@ export function parseLrcToLine(lrc: string, durationSeconds: number): any | null
     }
   }
 
+  return entriesToLine(entries, durationSeconds);
+}
+
+/**
+ * Timed text entries (seconds) into the "Line" shape. An entry's end is the next
+ * entry's start, blank entries included, so an instrumental gap closes the line
+ * before it; the last line ends at `durationSeconds`.
+ */
+export function entriesToLine(
+  entries: { time: number; text: string }[],
+  durationSeconds: number
+): any | null {
   if (entries.length === 0) return null;
-  entries.sort((a, b) => a.time - b.time);
+  entries = [...entries].sort((a, b) => a.time - b.time);
 
   const content = [];
   for (let i = 0; i < entries.length; i++) {
@@ -51,6 +63,22 @@ export function parseLrcToLine(lrc: string, durationSeconds: number): any | null
     EndTime: content[content.length - 1].EndTime,
     Content: content,
   };
+}
+
+// Credit lines Chinese services put in the lyric body ("作词 : …", "Lyrics by: …").
+const CREDIT_LINE =
+  /^(作词|作曲|编曲|制作人?|监制|混音|母带|词|曲|lyrics?|composer|composed|arranger|arranged|producer|produced|written)(\s*by)?\s*[:：]/i;
+
+export function isCreditLine(text: string): boolean {
+  return CREDIT_LINE.test(text.trim());
+}
+
+/** LRC text without its credit lines. */
+export function stripCreditLines(lrc: string): string {
+  return lrc
+    .split(/\r?\n/)
+    .filter((raw) => !isCreditLine(raw.replace(TIMESTAMP, "")))
+    .join("\n");
 }
 
 /** Plain, unsynced text into the "Static" shape. */

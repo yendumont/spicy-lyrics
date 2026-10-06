@@ -2,6 +2,8 @@ import { SpotifyPlayer } from "../../../components/Global/SpotifyPlayer.ts";
 import Logger from "../../Logger.ts";
 import { $lyricsProvider, $lyricsProviderFallback } from "../../stores.ts";
 import { fetchFromLrcLib } from "./LrcLib.ts";
+import { fetchFromNetEase } from "./NetEase.ts";
+import { fetchFromQQMusic } from "./QQMusic.ts";
 import { fetchFromUnison } from "./Unison.ts";
 import type { ExternalProviderId, LyricsProviderId, TrackInfo } from "./types.ts";
 
@@ -13,12 +15,16 @@ export const PROVIDER_LABELS: Record<LyricsProviderId, string> = {
   spicy: "Spicy Lyrics",
   unison: "Unison",
   lrclib: "LRCLIB",
+  netease: "NetEase",
+  qqmusic: "QQ Music",
 };
 
-const DEFAULT_ORDER: LyricsProviderId[] = ["spicy", "unison", "lrclib"];
+const DEFAULT_ORDER: LyricsProviderId[] = ["spicy", "unison", "lrclib", "netease", "qqmusic"];
 
 const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | null>> = {
   lrclib: fetchFromLrcLib,
+  netease: fetchFromNetEase,
+  qqmusic: fetchFromQQMusic,
   unison: fetchFromUnison,
 };
 

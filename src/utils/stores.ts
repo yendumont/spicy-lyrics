@@ -60,7 +60,7 @@ export const $simpleLyricsModeRenderingType = persistAtom<string>(
   "calculate"
 );
 export const $minimalLyricsMode = persistAtom<boolean>("minimalLyricsMode", false);
-// Which source is asked for lyrics first: "spicy" | "unison" | "lrclib".
+// Which source is asked for lyrics first: "spicy" | "unison" | "lrclib" | "netease" | "qqmusic".
 export const $lyricsProvider = persistAtom<string>("lyricsProvider", "spicy");
 // When the chosen source has nothing, try the remaining ones in turn.
 export const $lyricsProviderFallback = persistAtom<boolean>("lyricsProviderFallback", true);

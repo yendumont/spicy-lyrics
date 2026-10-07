@@ -1,6 +1,7 @@
 import { useStore } from "@nanostores/react";
 import React from "react";
 import {
+  $geniusEagerMatch,
   $geniusFavoriteArtists,
   $geniusLooseSearch,
   $geniusProxyUrl,
@@ -39,6 +40,7 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const geniusProxyUrl = useStore($geniusProxyUrl);
   const geniusLooseSearch = useStore($geniusLooseSearch);
   const geniusFavoriteArtists = useStore($geniusFavoriteArtists);
+  const geniusEagerMatch = useStore($geniusEagerMatch);
 
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
 
@@ -57,7 +59,9 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
 
   const r10 = matches(query, "Genius Favourite Artists", "Real artists whose songs you have under other people's names, for finding leaked and fan-uploaded songs on Genius.");
 
-  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10) return null;
+  const r11 = matches(query, "Genius Eager Matching", "When nothing proves which Genius page is right, show the best-looking one anyway instead of no lyrics.");
+
+  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10 && !r11) return null;
 
   return (
     <>
@@ -131,6 +135,17 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
           description="Genius only. For leaked and fan-uploaded songs: when the exact song and artist find nothing, search more broadly and use a result with the same cover art, a related artist, or an artist your library has already resolved. Gives up rather than guess a famous song of the same name, but can occasionally pick the wrong one."
         >
           <Toggle checked={geniusLooseSearch} onChange={(v) => $geniusLooseSearch.set(v)} />
+        </Row>
+      )}
+
+      {r11 && (
+        <Row
+          label="Genius Eager Matching"
+          description="Genius only. When nothing proves which Genius page is right, show the best-looking one anyway instead of no lyrics: a close title written the same way, by a page that is not famous. Shows more lyrics for leaked and uploaded songs, but can occasionally show another song's. Needs Genius Loose Search."
+          disabled={!geniusLooseSearch}
+          disabledReason="Enable Genius Loose Search to modify this setting"
+        >
+          <Toggle checked={geniusEagerMatch} onChange={(v) => $geniusEagerMatch.set(v)} />
         </Row>
       )}
 

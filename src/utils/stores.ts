@@ -77,6 +77,10 @@ export const $geniusProxyUrl = persistAtom<string>("geniusProxyUrl", "");
 // by default: it only does anything once a Genius proxy URL is set, and it prefers
 // returning nothing to guessing.
 export const $geniusLooseSearch = persistAtom<boolean>("geniusLooseSearch", true);
+// Genius only: when nothing proved a match, show the best-looking result anyway (a close
+// title, written the same way, by an obscure rather than famous page). Prefers showing
+// lyrics to showing none, so it can occasionally show the wrong song. On by default.
+export const $geniusEagerMatch = persistAtom<boolean>("geniusEagerMatch", true);
 // Genius only: real artists whose songs the listener has under other people's names
 // (comma-separated). Stands in for the learned library until enough songs are matched.
 export const $geniusFavoriteArtists = persistAtom<string>("geniusFavoriteArtists", "");

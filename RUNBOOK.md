@@ -144,29 +144,42 @@ Genius lyrics pages, only to Spotify's page, and holds no secrets.
 5. In Spotify: Spicy Lyrics, Settings, Lyrics Display, **Genius Proxy URL**, paste it, press
    Enter. Then move **Genius** up under **Lyrics Provider Priority** if you want it earlier.
 
-**Genius Loose Search** (Settings, Lyrics Display, off by default) widens Genius lookups
+**Genius Loose Search** (Settings, Lyrics Display, on by default) widens Genius lookups
 for leaked or fan-uploaded songs, where Spotify's artist is an uploader and Genius lists
 the real artist and a decorated title. Normally a result must match the song title and
-artist. With it on, a miss triggers broader searches (title alone with deeper results,
-other word orders, with the album). A result is used when:
+artist. With it on, a miss triggers broader searches: every title the song could go by
+(Spotify names like "Jaydes - idiot" are searched as "Jaydes" and as "idiot"), asked deep
+(20 results), then in other word orders, with the album and with symbol-free artist names.
+Decoration is ignored on both sides: brackets, "feat." and "prod." credits, hashtags,
+＊asterisk tags＊, zero-width characters. A Spotify title that begins a longer Genius title
+(Genius often names a page with its first lyric line) counts when it is 8+ letters long.
 
-1. its title is close and its cover art is the same picture as the playing song's, or
-2. its title is close and its artist resembles the Spotify artist (or a learned alias), or
-3. its title is long and unusual (12+ letters) and it is the only such result, or
-4. last resort: its title is exact, Genius has never heard of the Spotify artist (so it is
-   probably an uploader), and the result is by the only artist, among those with an exact
-   title match, that your library has already resolved behind uploader names in 3+ songs.
+The results are taken in this order, stopping at the first that applies:
 
-It never takes a longer title for a shorter one ("On Me" is not "Easy On Me") and never
-prefers a result for being famous, so it will often return nothing rather than guess.
+1. a close title with the same cover art as the playing song;
+2. a close title and a related artist (or a learned alias), or a long unusual title (12+ letters)
+   that only one result has;
+3. an exact-title result by a favourite artist (named in settings, or seen behind uploader
+   names in 3+ songs). If several qualify, the one written exactly like the song wins ("scars"
+   rather than "Scars"), then the artist your library has resolved most;
+4. **Genius Eager Matching** (on by default, needs Loose Search): the best-looking result even
+   though nothing proved it. It must have a title within reach, and scores higher for being
+   written like the song, a similar artist, a somewhat alike cover and an obscure page. Pages
+   with over a million views are never guessed, since the real song of an obscure upload is
+   almost never the famous song of the same name. Turn it off if you would rather see nothing
+   than risk another song's lyrics.
+
+It never takes a longer title for a shorter one ("On Me" is not "Easy On Me"), and it retries
+once when Genius answers with a passing error. On a 208-song test library of leaked and
+fan-uploaded songs, the share with lyrics found went from 80% to 96%.
 
 **Learned artists.** When a cover match proves that a Spotify artist is a Genius artist
 (for example "Yen" is "jaydes"), the pairing is remembered in `SL:geniusAliases` and used for
 that artist's later songs: they are searched for under the real name, which also finds songs
 the bare title buries. Separately, `SL:geniusArtists` counts which Genius artists have turned
-up behind uploader names (once per song); rule 4 above uses it, and searches for those artists
+up behind uploader names (once per song); rule 3 above uses it, and searches for those artists
 by name, because Genius's own search buries obscure songs under famous ones of the same title.
-Loose search is on by default and does nothing until a proxy URL is set. To forget what it
+Loose search and eager matching do nothing until a proxy URL is set. To forget what it
 learned, run `Spicetify.LocalStorage.remove("SL:geniusAliases")` and
 `Spicetify.LocalStorage.remove("SL:geniusArtists")` in Spotify's DevTools.
 

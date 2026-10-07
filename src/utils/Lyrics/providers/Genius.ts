@@ -3,12 +3,16 @@ import { parsePlainToStatic } from "./Lrc.ts";
 import { COVER_SAME_MAX_DISTANCE, coverDistance } from "./CoverMatch.ts";
 import { knownAliases, learnAlias, libraryArtists, noteArtist } from "./GeniusAliases.ts";
 import {
-  EXACT_TITLE,
+  TRUSTED_ARTIST_TITLE,
   cleanTitle,
+  describeCandidates,
   normalizeName,
   rankCandidates,
+  rankEager,
   rankLoose,
+  searchTitles,
   titleCandidates,
+  writtenAlike,
   type MatchOptions,
 } from "./Match.ts";
 import type { TrackInfo } from "./types.ts";
@@ -137,8 +141,16 @@ export function extractLyrics(html: string): string | null {
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
+// Genius answers now and then with a passing error (502, 503, 504) or asks to slow down (429).
+const RETRYABLE = new Set([429, 502, 503, 504]);
+const RETRY_DELAY_MS = 700;
+
 async function get(url: string): Promise<Response> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  let res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (RETRYABLE.has(res.status)) {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  }
   if (res.status === 404) return res;
   if (!res.ok) throw new Error(`Genius proxy responded ${res.status}`);
   return res;
@@ -206,54 +218,34 @@ async function strictPicks(base: string, track: TrackInfo): Promise<Pick[]> {
     .map((hit) => toPick(hit, "strict: title and artist match", { trusted: true }));
 }
 
-/**
- * Whether Genius has an artist of this name. A Spotify artist it has never heard of is
- * probably an uploader, not the song's real artist. Unknown when the lookup fails, which
- * counts as "yes": the caller then does not guess.
- */
-async function artistOnGenius(base: string, name: string): Promise<boolean> {
-  try {
-    const wanted = normalizeName(name);
-    if (!wanted) return true;
-
-    const res = await get(`${base}/search?q=${encodeURIComponent(name)}`);
-    if (res.status === 404) return false;
-
-    const body = (await res.json()) as {
-      response?: { sections?: { hits?: { type?: string; result?: { _type?: string; name?: string } }[] }[] };
-    };
-    return (body?.response?.sections ?? []).some((section) =>
-      (section.hits ?? []).some(
-        (hit) =>
-          (hit.type === "artist" || hit.result?._type === "artist") &&
-          normalizeName(hit.result?.name ?? "") === wanted
-      )
-    );
-  } catch {
-    return true;
-  }
-}
 
 /** Artist name with symbols removed, so "$uicideboy$" is searchable as "uicideboy". */
 const plainWords = (value: string) => value.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 
 /**
- * Broader searches for when the exact song and artist found nothing: the title
- * alone (deeper results), in other word orders, with the album, and with
- * symbol-free artist names. Results are pooled; those with a close title and the
- * same cover picture come first, then the closest by title, artist and popularity.
+ * Broader searches for when the exact song and artist found nothing: each title the
+ * song could go by ("Artist - Song" is two), searched bare and deep, then in other
+ * word orders, with the album, and with symbol-free artist names. Results are pooled
+ * and picked from in order of how much is known:
+ *   1. a close title with the same cover picture
+ *   2. a close title and a related artist, or a long unusual title
+ *   3. an artist the listener's library already hosts, with an exact title
+ *   4. with `eager`: the best-looking result even though nothing proved it
  */
 async function loosePicks(
   base: string,
   track: TrackInfo,
   skip: Set<string>,
-  favorites: string[]
+  favorites: string[],
+  eager: boolean,
+  trace?: ReturnType<typeof describeCandidates>
 ): Promise<Pick[]> {
   const options = matchOptions(track);
-  const title = cleanTitle(track.name);
+  const titles = searchTitles(track.name).slice(0, 2);
+  const title = titles[0];
   const artist = plainWords(track.artist);
   const queries = [
-    title,
+    ...titles,
     `${artist} ${title}`,
     track.album ? `${title} ${plainWords(track.album)}` : "",
     `${title} ${artist}`,
@@ -304,15 +296,19 @@ async function loosePicks(
     return confirmed.sort((a, b) => a.distance - b.distance);
   };
 
-  for (const query of queries) {
-    // The bare title is the search famous songs of the same name crowd out, so it goes deep.
-    const found = await searchSongs(base, query, query === title ? DEEP_RESULTS : undefined);
-    logger.debug("Genius loose search", query, found.map((h) => `${h.title} / ${h.artists[0]}`));
+  const addToPool = (found: Hit[]) => {
     for (const hit of found) {
       // Genius's own Translations / Romanizations accounts re-post the same lyrics.
       if (/^genius\b/i.test(hit.artists[0] ?? "")) continue;
       if (!skip.has(hit.path)) pool.set(hit.path, hit);
     }
+  };
+
+  for (const query of queries) {
+    // A bare title is the search famous songs of the same name crowd out, so it goes deep.
+    const found = await searchSongs(base, query, titles.includes(query) ? DEEP_RESULTS : undefined);
+    logger.debug("Genius loose search", query, found.map((h) => `${h.title} / ${h.artists[0]}`));
+    addToPool(found);
     // A cover match, or enough plausible matches to try: stop searching.
     if ((await coverConfirmed()).length > 0) break;
     if (rankLoose(track, [...pool.values()], options).length >= MAX_CANDIDATES) break;
@@ -332,59 +328,77 @@ async function loosePicks(
     ...guessed.map((h) => toPick(h, "loose: closest title and artist", { trusted: true })),
   ];
 
-  // Nothing proved a match. Last: an artist this listener's library already hosts.
+  // Nothing proved a match. Next: an artist this listener's library already hosts.
   if (picks.length === 0) {
-    const fromLibrary = await libraryPick(base, track, pool, title, options, favorites);
+    const fromLibrary = await libraryPick(base, track, pool, titles, options, favorites, addToPool);
     if (fromLibrary) picks.push(fromLibrary);
   }
 
+  // Still nothing, and the listener would rather see lyrics than none: the best guess.
+  if (picks.length === 0 && eager) {
+    const best = rankEager(
+      track,
+      [...pool.values()].map((hit) => ({ ...hit, coverDistance: coverDistances.get(hit.path) ?? null })),
+      options
+    );
+    if (best[0]) picks.push(toPick(best[0], "loose: best guess, nothing proved it"));
+  }
+
+  trace?.push(...describeCandidates(track, [...pool.values()], options));
   return picks.slice(0, MAX_CANDIDATES);
 }
 
 /**
- * For an unknown uploader's song with no proof of its real artist: the sole exact-title
- * result by an artist seen behind uploader names in several of this listener's songs.
- * Genius's own search buries obscure songs under famous ones of the same name, so the
- * library's artists are searched for by name alongside the title. Declines when Spotify's
- * artist is itself known to Genius (that song would have matched by name), or when
- * more than one library artist has a song of that title.
+ * For a song with no proof of its real artist: the exact-title result by an artist
+ * this listener's library hosts behind uploader names (named in settings, or seen in
+ * several songs). Genius's own search buries obscure songs under famous ones of the
+ * same name, so those artists are searched for by name alongside the title. When more
+ * than one such artist has a song of that title, the one written exactly like the
+ * playing song wins, then the one the library has resolved most.
  */
 async function libraryPick(
   base: string,
   track: TrackInfo,
   pool: Map<string, Hit>,
-  title: string,
+  titles: string[],
   options: MatchOptions,
-  favorites: string[]
+  favorites: string[],
+  addToPool: (found: Hit[]) => void
 ): Promise<Pick | null> {
   // Artists the listener named count as fully established; learned ones need a few songs.
   const named = favorites.map((name) => ({ name, key: normalizeName(name), songs: Number.POSITIVE_INFINITY }));
-  const library = [...named, ...libraryArtists(MIN_LIBRARY_SONGS)]
-    .filter((artist, i, all) => artist.key && all.findIndex((other) => other.key === artist.key) === i);
+  const library = [...named, ...libraryArtists(MIN_LIBRARY_SONGS)].filter(
+    (artist, i, all) => artist.key && all.findIndex((other) => other.key === artist.key) === i
+  );
   if (library.length === 0) return null;
 
   for (const artist of library.slice(0, MAX_LIBRARY_QUERIES)) {
-    const found = await searchSongs(base, `${title} ${artist.name}`);
-    logger.debug("Genius library search", `${title} ${artist.name}`, found.map((h) => `${h.title} / ${h.artists[0]}`));
-    for (const hit of found) {
-      if (!/^genius\b/i.test(hit.artists[0] ?? "")) pool.set(hit.path, hit);
+    for (const title of titles) {
+      const found = await searchSongs(base, `${title} ${artist.name}`);
+      logger.debug("Genius library search", `${title} ${artist.name}`, found.map((h) => `${h.title} / ${h.artists[0]}`));
+      addToPool(found);
     }
   }
 
-  const keys = new Set(library.map((a) => a.key));
-  const exact = titleCandidates(track, [...pool.values()], options, EXACT_TITLE).filter((hit) =>
-    keys.has(normalizeName(hit.artists[0] ?? ""))
-  );
-  if (new Set(exact.map((hit) => normalizeName(hit.artists[0] ?? ""))).size !== 1) return null;
+  const keys = new Map(library.map((a) => [a.key, a]));
+  const written = [track.name, ...titles];
+  const exact = titleCandidates(track, [...pool.values()], options, TRUSTED_ARTIST_TITLE)
+    .filter((hit) => keys.has(normalizeName(hit.artists[0] ?? "")))
+    .map((hit) => ({
+      hit,
+      alike: written.some((w) => writtenAlike(w, hit.title)),
+      songs: Math.min(keys.get(normalizeName(hit.artists[0] ?? ""))?.songs ?? 0, 1_000_000),
+    }))
+    .sort((a, b) => Number(b.alike) - Number(a.alike) || b.songs - a.songs);
 
-  if (await artistOnGenius(base, track.artist)) return null;
+  const best = exact[0];
+  if (!best) return null;
 
-  const seen = library.find((a) => a.key === normalizeName(exact[0].artists[0] ?? ""));
   return toPick(
-    exact[0],
-    seen && Number.isFinite(seen.songs)
-      ? `loose: ${exact[0].artists[0]}, whom your library has resolved ${seen.songs}x`
-      : `loose: ${exact[0].artists[0]}, a favourite artist you listed`
+    best.hit,
+    Number.isFinite(keys.get(normalizeName(best.hit.artists[0] ?? ""))?.songs ?? NaN)
+      ? `loose: ${best.hit.artists[0]}, whom your library has resolved ${keys.get(normalizeName(best.hit.artists[0] ?? ""))?.songs}x`
+      : `loose: ${best.hit.artists[0]}, a favourite artist you listed`
   );
 }
 
@@ -406,29 +420,33 @@ export async function explainGenius(
   proxyUrl: string,
   loose = false,
   learn = false,
-  favorites: string[] = []
-): Promise<{ strict: Pick[]; loose: Pick[] } | null> {
+  favorites: string[] = [],
+  eager = false
+): Promise<{ strict: Pick[]; loose: Pick[]; pool: ReturnType<typeof describeCandidates> } | null> {
   const base = normalizeProxyUrl(proxyUrl);
   if (!base) return null;
 
   const strict = await strictPicks(base, track);
-  const looser = strict.length === 0 && loose ? await loosePicks(base, track, new Set(), favorites) : [];
+  const pool: ReturnType<typeof describeCandidates> = [];
+  const looser =
+    strict.length === 0 && loose ? await loosePicks(base, track, new Set(), favorites, eager, pool) : [];
   // As in fetchFromGenius, the best pick is the one whose lyrics would be shown.
   const best = strict[0] ?? looser[0];
   if (learn && best) commitPick(track, best);
-  return { strict, loose: looser };
+  return { strict, loose: looser, pool };
 }
 
 /**
  * Lyrics from Genius through the user's proxy. The exact song and artist are tried
- * first. With `loose` on, a miss falls through to broader searches that take the
- * closest-looking result instead.
+ * first. With `loose` on, a miss falls through to broader searches; with `eager` on as
+ * well, those end in a best guess rather than nothing.
  */
 export async function fetchFromGenius(
   track: TrackInfo,
   proxyUrl: string,
   loose = false,
-  favorites: string[] = []
+  favorites: string[] = [],
+  eager = false
 ): Promise<any | null> {
   const base = normalizeProxyUrl(proxyUrl);
   if (!base) return null;
@@ -445,7 +463,7 @@ export async function fetchFromGenius(
   }
 
   if (loose) {
-    for (const pick of await loosePicks(base, track, tried, favorites)) {
+    for (const pick of await loosePicks(base, track, tried, favorites, eager)) {
       const lyrics = await lyricsAt(base, pick.path);
       if (lyrics) {
         logger.debug("Genius loose match used", pick.path, pick.how);

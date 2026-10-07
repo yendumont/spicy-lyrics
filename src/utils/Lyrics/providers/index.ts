@@ -1,6 +1,7 @@
 import { COVER_PLACEHOLDER_URL, SpotifyPlayer } from "../../../components/Global/SpotifyPlayer.ts";
 import Logger from "../../Logger.ts";
 import {
+  $geniusEagerMatch,
   $geniusFavoriteArtists,
   $geniusLooseSearch,
   $geniusProxyUrl,
@@ -40,7 +41,8 @@ const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | n
         .get()
         .split(/[,\n]/)
         .map((name) => name.trim())
-        .filter(Boolean)
+        .filter(Boolean),
+      $geniusEagerMatch.get()
     ),
 };
 

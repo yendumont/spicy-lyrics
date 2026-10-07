@@ -6,33 +6,27 @@ import {
   $geniusProxyUrl,
   $lyricsProvider,
   $lyricsProviderFallback,
+  $lyricsProviderOrder,
+  $lyricsProvidersDisabled,
 } from "../../stores.ts";
 import { toImageUrl } from "./CoverMatch.ts";
 import { fetchFromGenius } from "./Genius.ts";
 import { fetchFromLrcLib } from "./LrcLib.ts";
+import { fetchFromLrcMux } from "./LrcMux.ts";
 import { fetchFromNetEase } from "./NetEase.ts";
 import { fetchFromQQMusic } from "./QQMusic.ts";
 import { fetchFromUnison } from "./Unison.ts";
+import { PROVIDER_LABELS, activeProviders, resolveOrder } from "./ProviderOrder.ts";
 import type { ExternalProviderId, LyricsProviderId, TrackInfo } from "./types.ts";
 
 export type { ExternalProviderId, LyricsProviderId } from "./types.ts";
+export { DEFAULT_ORDER, PROVIDER_LABELS, activeProviders, resolveOrder } from "./ProviderOrder.ts";
 
 const logger = new Logger("Lyrics Providers");
 
-export const PROVIDER_LABELS: Record<LyricsProviderId, string> = {
-  spicy: "Spicy Lyrics",
-  unison: "Unison",
-  lrclib: "LRCLIB",
-  netease: "NetEase",
-  qqmusic: "QQ Music",
-  genius: "Genius",
-};
-
-// Genius is last: it only has unsynced text, so with fallback on it is a last resort.
-const DEFAULT_ORDER: LyricsProviderId[] = ["spicy", "unison", "lrclib", "netease", "qqmusic", "genius"];
-
 const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | null>> = {
   lrclib: fetchFromLrcLib,
+  lrcmux: fetchFromLrcMux,
   netease: fetchFromNetEase,
   qqmusic: fetchFromQQMusic,
   unison: fetchFromUnison,
@@ -56,15 +50,16 @@ const MAX_RANK: Partial<Record<ExternalProviderId, number>> = {
 };
 
 /**
- * The providers to try, in order. The chosen provider comes first; with fallback
- * on, the rest follow in the default order. Spicy Lyrics is always in the list
- * so the main API path keeps its place in the sequence.
+ * The providers to try, in the listener's priority order, minus any they switched
+ * off. With fallback off only the first is asked. Spicy Lyrics takes part like the
+ * others: its place in the list is where the main API call happens.
  */
 export function GetProviderOrder(): LyricsProviderId[] {
-  const primary = $lyricsProvider.get() as LyricsProviderId;
-  if (!DEFAULT_ORDER.includes(primary)) return DEFAULT_ORDER;
-  if (!$lyricsProviderFallback.get()) return [primary];
-  return [primary, ...DEFAULT_ORDER.filter((id) => id !== primary)];
+  return activeProviders(
+    resolveOrder($lyricsProviderOrder.get(), $lyricsProvider.get()),
+    $lyricsProvidersDisabled.get(),
+    $lyricsProviderFallback.get()
+  );
 }
 
 /** The playing item's cover as an https URL, or undefined when it only has the placeholder. */

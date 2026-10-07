@@ -7,17 +7,18 @@ import {
   $lineHoverBackground,
   $lyricsProvider,
   $lyricsProviderFallback,
+  $lyricsProviderOrder,
+  $lyricsProvidersDisabled,
   $preferBestSync,
   $minimalLyricsMode,
   $simpleLyricsMode,
   $simpleLyricsModeRenderingType
 } from "../../../utils/stores.ts";
-import { matches, Row, Select, SectionTitle, TextInput, Toggle } from "./components.tsx";
+import { DEFAULT_ORDER, PROVIDER_LABELS, resolveOrder } from "../../../utils/Lyrics/providers/ProviderOrder.ts";
+import { matches, PriorityList, Row, Select, SectionTitle, TextInput, Toggle } from "./components.tsx";
 
 const SECTION_NAME = "Lyrics Display";
 const renderingTypeOptions = ["calculate", "animate"];
-const providerOptions = ["spicy", "unison", "lrclib", "netease", "qqmusic", "genius"];
-const providerLabels = ["Spicy Lyrics", "Unison", "LRCLIB", "NetEase", "QQ Music", "Genius"];
 
 interface Props {
   query: string;
@@ -29,7 +30,10 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const simpleLyricsModeRenderingType = useStore($simpleLyricsModeRenderingType);
   const minimalLyricsMode = useStore($minimalLyricsMode);
   const lineHoverBackground = useStore($lineHoverBackground);
-  const lyricsProvider = useStore($lyricsProvider);
+  const legacyProvider = useStore($lyricsProvider);
+  const savedOrder = useStore($lyricsProviderOrder);
+  const disabledProviders = useStore($lyricsProvidersDisabled);
+  const providerOrder = resolveOrder(savedOrder, legacyProvider);
   const lyricsProviderFallback = useStore($lyricsProviderFallback);
   const preferBestSync = useStore($preferBestSync);
   const geniusProxyUrl = useStore($geniusProxyUrl);
@@ -42,8 +46,8 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const r2 = matches(query, "Simple Mode: Text Animation Style", "How lyrics text transitions are rendered in Simple Lyrics Mode.");
   const r3 = matches(query, "Minimal Lyrics Mode", "Hides sung lyrics lines in Fullscreen and Cinema Mode");
   const r4 = matches(query, "Line Hover Background", "Shows a highlight box behind a lyrics line when you hover over it");
-  const r5 = matches(query, "Lyrics Provider", "Which service lyrics are fetched from first: Spicy Lyrics, Unison, LRCLIB, NetEase, QQ Music or Genius.");
-  const r6 = matches(query, "Provider Fallback", "When the chosen lyrics provider has nothing for a song, try the other providers in turn.");
+  const r5 = matches(query, "Lyrics Provider Priority", "The order lyrics providers are asked in, and which are used: Spicy Lyrics, Unison, LRCLIB, LRCMux, NetEase, QQ Music, Genius.");
+  const r6 = matches(query, "Provider Fallback", "When the first lyrics provider has nothing for a song, try the others in turn.");
 
   const r7 = matches(query, "Prefer Best Sync", "Keep asking providers past a worse-synced result and show the best one: word sync over line sync over unsynced.");
 
@@ -61,14 +65,26 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
 
       {r5 && (
         <Row
-          label="Lyrics Provider"
-          description="Which service lyrics are fetched from first. Already-loaded songs stay cached until the cache expires or is cleared."
+          stacked
+          label="Lyrics Provider Priority"
+          description="Providers are asked from top to bottom; turn off the ones you do not want. With Provider Fallback off, only the first one that is on is used. Songs already loaded stay cached for 3 days or until the cache is cleared."
         >
-          <Select
-            value={lyricsProvider}
-            options={providerOptions}
-            labels={providerLabels}
-            onChange={(v) => $lyricsProvider.set(v)}
+          <PriorityList
+            order={providerOrder}
+            disabled={disabledProviders}
+            labels={PROVIDER_LABELS}
+            onChange={(order, disabled) => {
+              $lyricsProviderOrder.set(order);
+              $lyricsProvidersDisabled.set(disabled);
+            }}
+            onReset={
+              providerOrder.join() === DEFAULT_ORDER.join() && disabledProviders.length === 0
+                ? undefined
+                : () => {
+                    $lyricsProviderOrder.set([...DEFAULT_ORDER]);
+                    $lyricsProvidersDisabled.set([]);
+                  }
+            }
           />
         </Row>
       )}
@@ -76,7 +92,7 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
       {r6 && (
         <Row
           label="Provider Fallback"
-          description="When the chosen provider has nothing for a song, try the other providers in turn."
+          description="When the first provider has nothing for a song, try the others in turn, in the order above."
         >
           <Toggle
             checked={lyricsProviderFallback}

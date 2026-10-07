@@ -122,6 +122,74 @@ export function TextInput({
 }
 
 /**
+ * A prioritised list of sources: asked from top to bottom, each can be moved up or
+ * down and switched off.
+ */
+export function PriorityList({
+  order,
+  disabled,
+  labels,
+  onChange,
+  onReset,
+}: {
+  order: string[];
+  disabled: string[];
+  labels: Record<string, string>;
+  onChange: (order: string[], disabled: string[]) => void;
+  onReset?: () => void;
+}) {
+  const move = (index: number, by: -1 | 1) => {
+    const target = index + by;
+    if (target < 0 || target >= order.length) return;
+    const next = [...order];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next, disabled);
+  };
+
+  const toggle = (id: string) =>
+    onChange(order, disabled.includes(id) ? disabled.filter((other) => other !== id) : [...disabled, id]);
+
+  return (
+    <div className="sl-sp-provider-list">
+      {order.map((id, index) => {
+        const name = labels[id] ?? id;
+        const off = disabled.includes(id);
+        return (
+          <div key={id} className={`sl-sp-provider${off ? " sl-sp-provider--off" : ""}`}>
+            <span className="sl-sp-provider-rank">{index + 1}</span>
+            <span className="sl-sp-provider-name">{name}</span>
+            <button
+              type="button"
+              className="sl-sp-provider-btn"
+              onClick={() => move(index, -1)}
+              disabled={index === 0}
+              aria-label={`Move ${name} up`}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="sl-sp-provider-btn"
+              onClick={() => move(index, 1)}
+              disabled={index === order.length - 1}
+              aria-label={`Move ${name} down`}
+            >
+              ↓
+            </button>
+            <Toggle checked={!off} onChange={() => toggle(id)} />
+          </div>
+        );
+      })}
+      {onReset && (
+        <button type="button" className="sl-sp-provider-reset" onClick={onReset}>
+          Reset to default order
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * Bipolar position slider — a snapping range control centred on a neutral
  * point with a negative axis to the left and a positive axis to the right.
  * The filled segment grows outward from the centre toward the thumb, so the

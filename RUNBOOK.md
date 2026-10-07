@@ -1,6 +1,6 @@
 # Runbook: running this fork next to (or instead of) official Spicy Lyrics
 
-This fork adds four lyrics providers (**LRCLIB**, **Unison**, **NetEase**, **QQ Music**), provider fallback and a
+This fork adds five lyrics providers (**LRCLIB**, **Unison**, **LRCMux**, **NetEase**, **QQ Music**) plus Genius, an adjustable provider priority list, provider fallback and a
 "Prefer Best Sync" mode. It installs into Spicetify as its **own extension**,
 `spicy-lyrics-providers.js`, so official Spicy Lyrics updates cannot overwrite it.
 
@@ -89,12 +89,42 @@ live-reload helper. The install script removes that helper from your config.
 1. `spicetify config extensions` lists `spicy-lyrics-providers.js` and not
    `spicy-lyrics.mjs`.
 2. In Spotify, open Spicy Lyrics, then Settings, Lyrics Display. You should see
-   **Lyrics Provider**, **Provider Fallback** and **Prefer Best Sync**.
+   **Lyrics Provider Priority**, **Provider Fallback** and **Prefer Best Sync**.
 3. Play a song. The credit under the lyrics reads "Provided by: ..." with the source.
+
+## Provider priority
+
+Settings, Lyrics Display, **Lyrics Provider Priority** lists every source from first asked
+to last. The arrows move a provider up or down; its switch turns it off. **Provider
+Fallback** decides whether the list is walked or only its first enabled entry is used, and
+**Prefer Best Sync** whether the walk continues past a worse-synced result. The default order
+is Spicy Lyrics, Unison, LRCLIB, LRCMux, NetEase, QQ Music, Genius; **Reset to default order**
+appears once it is changed. If every provider is switched off, Spicy Lyrics is used anyway.
+
+Stored as `lyricsProviderOrder` and `lyricsProvidersDisabled` in `SL:settings`. The older single
+`lyricsProvider` choice is only read until a list has been saved, so existing settings carry over.
+
+## LRCMux
+
+[lrcmux.dev](https://lrcmux.dev) combines KuGou, LRCLIB, YouTube Music and Genius and returns the
+best sync level it finds; the credit names the service ("LRCMux (KuGou)"). No setup. The code tidies
+what it receives before showing it:
+
+- punctuation and brackets sent as separate "words" are joined to their neighbour (`on` `,` is `on,`);
+- word times are put in order, overlaps trimmed, zero-length words given a minimum, and each line
+  runs from its first to its last word rather than on into the next gap;
+- credit lines ("作词 : …", "Lyrics by: …") are dropped;
+- KuGou censors profanity; if it does, LRCMux is asked again without KuGou, and the uncensored
+  (usually line-synced) text is used, falling back to the censored version if nothing else exists;
+- a result for a recording more than 8 s longer or shorter than the playing one is refused.
+
+Timing is whatever the source has. Measured against Spicy's word sync for the same songs, KuGou
+ran from about 120 ms early to 270 ms late depending on the song, and LRCLIB lines about 190 ms
+early, so no single offset corrects them. Use the global playback offset setting to nudge a song.
 
 ## Genius fallback (optional)
 
-Genius is a provider in the **Lyrics Provider** list, last in the default order. With
+Genius is a provider in the **Lyrics Provider Priority** list, last in the default order. With
 **Provider Fallback** on it is therefore asked only after every other provider came up
 empty (it gives unsynced text, so it is skipped once anything better is found). You can
 also choose it as the first provider. It needs the proxy URL below; without one it finds
@@ -112,7 +142,7 @@ Genius lyrics pages, only to Spotify's page, and holds no secrets.
    click **Deploy**.
 4. Copy the address (like `https://spicy-genius.yourname.workers.dev`).
 5. In Spotify: Spicy Lyrics, Settings, Lyrics Display, **Genius Proxy URL**, paste it, press
-   Enter. Then pick **Genius** under **Lyrics Provider** if you want it first.
+   Enter. Then move **Genius** up under **Lyrics Provider Priority** if you want it earlier.
 
 **Genius Loose Search** (Settings, Lyrics Display, off by default) widens Genius lookups
 for leaked or fan-uploaded songs, where Spotify's artist is an uploader and Genius lists
@@ -184,6 +214,7 @@ install script.
 
 - `scripts/install-spicetify.ps1`: build, install, register, apply (and `-Uninstall`).
 - `scripts/update-fork.ps1`: merge upstream, then call the install script.
-- `src/utils/Lyrics/providers/`: LRCLIB, Unison, NetEase and QQ Music clients (the last two use unofficial endpoints through `Spicetify.CosmosAsync`), LRC parsing, sync ranking.
+- `src/utils/Lyrics/providers/`: LRCLIB, Unison, LRCMux, NetEase and QQ Music clients (the last two use unofficial endpoints through `Spicetify.CosmosAsync`), LRC parsing, sync ranking.
+- `src/utils/Lyrics/providers/ProviderOrder.ts`: the default order, provider labels, and how a saved priority list becomes the providers to ask.
 - `src/utils/Lyrics/fetchLyrics.ts`: provider order and fallback around the Spicy API call.
 - `src/utils/Lyrics/providers/Genius.ts`, `workers/genius-proxy/worker.js`: the Genius client and the Cloudflare Worker it talks to.

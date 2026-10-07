@@ -60,8 +60,13 @@ export const $simpleLyricsModeRenderingType = persistAtom<string>(
   "calculate"
 );
 export const $minimalLyricsMode = persistAtom<boolean>("minimalLyricsMode", false);
-// Which source is asked for lyrics first: "spicy" | "unison" | "lrclib" | "netease" | "qqmusic" | "genius".
+// The old single "first provider" choice. Only read when no priority list has been
+// saved yet, so existing settings carry over.
 export const $lyricsProvider = persistAtom<string>("lyricsProvider", "spicy");
+// The listener's priority list (provider ids, first asked first), and the providers
+// they switched off. Empty means the built-in order.
+export const $lyricsProviderOrder = persistAtom<string[]>("lyricsProviderOrder", []);
+export const $lyricsProvidersDisabled = persistAtom<string[]>("lyricsProvidersDisabled", []);
 // When the chosen source has nothing, try the remaining ones in turn.
 export const $lyricsProviderFallback = persistAtom<boolean>("lyricsProviderFallback", true);
 // Base URL of the user's own Genius proxy (workers/genius-proxy), which the "genius"

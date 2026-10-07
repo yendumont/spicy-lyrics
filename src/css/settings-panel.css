@@ -449,6 +449,80 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
     }
   }
 
+  /* Provider priority list: one tinted row per source, with move and on/off controls */
+  .sl-sp-provider-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: 100%;
+  }
+
+  .sl-sp-provider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px 10px;
+    background: var(--accent-tint-bg);
+    border-radius: var(--radius-sm);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    transition: opacity var(--dur-fast) var(--ease-standard);
+  }
+
+  .sl-sp-provider--off .sl-sp-provider-name,
+  .sl-sp-provider--off .sl-sp-provider-rank {
+    opacity: 0.4;
+  }
+
+  .sl-sp-provider-rank {
+    width: 1.5em;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: var(--text-caption-size);
+  }
+
+  .sl-sp-provider-name {
+    flex: 1;
+    color: var(--color-text-primary);
+    font-weight: var(--w-medium);
+  }
+
+  .sl-sp-provider-btn,
+  .sl-sp-provider-reset {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font: inherit;
+    border-radius: var(--radius-sm);
+    transition: background var(--dur-fast) var(--ease-standard);
+
+    &:hover:not(:disabled) {
+      background: var(--accent-tint-bg-hover);
+    }
+
+    &:disabled {
+      opacity: 0.25;
+      cursor: default;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-text-primary);
+      outline-offset: 1px;
+    }
+  }
+
+  .sl-sp-provider-btn {
+    padding: 2px 8px;
+  }
+
+  .sl-sp-provider-reset {
+    align-self: flex-start;
+    padding: 4px 8px;
+    font-size: var(--text-caption-size);
+    color: var(--color-text-secondary);
+  }
+
   /* Text field: the select's surface, but typeable */
   .sl-sp-text {
     width: 260px;

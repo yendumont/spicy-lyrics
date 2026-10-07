@@ -8,6 +8,7 @@ const ProviderMap = {
     "netease": "NetEase",
     "qqmusic": "QQ Music",
     "genius": "Genius",
+    "lrcmux": "LRCMux",
 } as const;
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {
@@ -23,6 +24,8 @@ export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): vo
     if (match) providerLabel = match[1];
   }
 
-  ProviderElement.textContent = `Provided by: ${providerLabel}`;
+  // An aggregator names the service it got the lyrics from ("LRCMux (KuGou)").
+  const detail = typeof data.sourceDetail === "string" && data.sourceDetail ? ` (${data.sourceDetail})` : "";
+  ProviderElement.textContent = `Provided by: ${providerLabel}${detail}`;
   LyricsContainer.appendChild(ProviderElement);
 }

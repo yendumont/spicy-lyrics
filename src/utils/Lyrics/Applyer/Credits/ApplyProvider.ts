@@ -9,6 +9,7 @@ const ProviderMap = {
     "qqmusic": "QQ Music",
     "genius": "Genius",
     "lrcmux": "LRCMux",
+    "lrcred": "lrc.red",
 } as const;
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {

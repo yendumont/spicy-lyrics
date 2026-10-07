@@ -65,6 +65,48 @@ export function entriesToLine(
   };
 }
 
+/**
+ * Word-timed lyrics as line-timed ones: each line's words joined, and timed from its
+ * first word to its last. Anything that is not word-timed comes back unchanged.
+ */
+export function syllablesToLine(parsed: any): any | null {
+  if (parsed?.Type !== "Syllable") return parsed;
+
+  const join = (syllables: any[]) =>
+    syllables
+      .map((s) => s.Text + (s.IsPartOfWord ? "" : " "))
+      .join("")
+      .trim();
+
+  const content: any[] = [];
+  for (const vocal of parsed.Content ?? []) {
+    const lead = vocal.Lead;
+    if (!lead?.Syllables?.length) continue;
+
+    let text = join(lead.Syllables);
+    // Backing vocals keep their place at the end of the line, in brackets.
+    const backing = (vocal.Background ?? []).map((b: any) => join(b.Syllables ?? [])).filter(Boolean);
+    if (backing.length > 0) text += ` ${backing.map((b: string) => (b.startsWith("(") ? b : `(${b})`)).join(" ")}`;
+
+    content.push({
+      Type: "Vocal",
+      OppositeAligned: !!vocal.OppositeAligned,
+      Text: text,
+      StartTime: lead.StartTime,
+      EndTime: lead.EndTime,
+    });
+  }
+
+  if (content.length === 0) return null;
+  return {
+    ...parsed,
+    Type: "Line",
+    StartTime: content[0].StartTime,
+    EndTime: content[content.length - 1].EndTime,
+    Content: content,
+  };
+}
+
 // Credit lines Chinese services put in the lyric body ("作词 : …", "Lyrics by: …").
 const CREDIT_LINE =
   /^(作词|作曲|编曲|制作人?|监制|混音|母带|词|曲|lyrics?|composer|composed|arranger|arranged|producer|produced|written)(\s*by)?\s*[:：]/i;

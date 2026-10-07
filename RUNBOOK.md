@@ -1,6 +1,6 @@
 # Runbook: running this fork next to (or instead of) official Spicy Lyrics
 
-This fork adds five lyrics providers (**LRCLIB**, **Unison**, **LRCMux**, **NetEase**, **QQ Music**) plus Genius, an adjustable provider priority list, provider fallback and a
+This fork adds six lyrics providers (**lrc.red**, **LRCLIB**, **Unison**, **LRCMux**, **NetEase**, **QQ Music**) plus Genius, an adjustable provider priority list, provider fallback and a
 "Prefer Best Sync" mode. It installs into Spicetify as its **own extension**,
 `spicy-lyrics-providers.js`, so official Spicy Lyrics updates cannot overwrite it.
 
@@ -98,11 +98,49 @@ Settings, Lyrics Display, **Lyrics Provider Priority** lists every source from f
 to last. The arrows move a provider up or down; its switch turns it off. **Provider
 Fallback** decides whether the list is walked or only its first enabled entry is used, and
 **Prefer Best Sync** whether the walk continues past a worse-synced result. The default order
-is Spicy Lyrics, Unison, LRCLIB, LRCMux, NetEase, QQ Music, Genius; **Reset to default order**
+is Spicy Lyrics, lrc.red, Unison, LRCLIB, LRCMux, NetEase, QQ Music, Genius. A provider added
+in a later version appears just above Genius for anyone who has arranged their own list.
+**Reset to default order**
 appears once it is changed. If every provider is switched off, Spicy Lyrics is used anyway.
 
 Stored as `lyricsProviderOrder` and `lyricsProvidersDisabled` in `SL:settings`. The older single
 `lyricsProvider` choice is only read until a list has been saved, so existing settings carry over.
+
+## lrc.red
+
+[lrc.red](https://lrc.red) is a free public catalogue of lyrics for about 30 million tracks, keyed by
+ISRC (`lrc.red/s/<ISRC>.ttml`, `.lrc`, `.json`). No setup, no key, CORS open. Credit to its makers
+and to binimum and edideaur from Monochrome, as the site asks.
+
+Spotify does not give the client a track's ISRC, so the track is found through the site's own
+`search.json`, which also reports each track's length. A result is used only when its title equals
+the playing title (brackets, "feat." and similar ignored), and either its artist matches or its
+length is within 0.5 s. That tight figure comes from a 418-track test library: real matches by the
+same artist differed in length by up to about a second, while wrong same-titled songs by other
+artists sat at 1.0 to 1.4 s. Up to three matches are tried in order, since the closest has no
+lyrics in some cases; word-timed TTML is preferred, line-timed LRC is the fallback.
+
+**Hand-timed versus model-timed.** Many lrc.red songs have their words timed by the site's own
+model, not by a person; its song page says "Word-synced by lrc.red's in-house model — these lyrics
+were never timed by hand", and the data behind the page flags it as `byModel` (in
+`/s/<ISRC>.song.json`). The model can be inaccurate. **lrc.red Word Sync** (Settings, Lyrics
+Display) chooses what to do:
+
+- **Hand-timed only** (default): word sync only where a person timed it; model-timed songs are shown
+  line-synced, and with Prefer Best Sync on, other providers get the chance to supply word sync.
+  If lrc.red cannot say how a song was timed, it is treated as model-timed.
+- **All word sync**: every word timing the file contains.
+- **No word sync**: line sync only.
+
+On a 418-track test library, 224 tracks had lyrics, and 145 of those were model-timed (the public
+`.ttml` carries word timing for 38 of them and line timing only for the other 107); 3 had hand-timed
+word sync, 33 hand-timed line sync, and 43 were unsynced.
+
+Timing was compared against Spicy's own word sync (Apple Music and the Spicy server) for two
+hand-timed songs (Blinding Lights, Levitating): word starts median within about 20 ms, 10th to 90th
+percentile about ±80 ms, identical line structure, and the site's `lyricOffset` already applied. That
+check covers hand-timed songs only; the accuracy of the model-timed word sync was not measured.
+The catalogue has gaps (for example Eminem's "Without Me" is not in it).
 
 ## LRCMux
 
@@ -227,7 +265,7 @@ install script.
 
 - `scripts/install-spicetify.ps1`: build, install, register, apply (and `-Uninstall`).
 - `scripts/update-fork.ps1`: merge upstream, then call the install script.
-- `src/utils/Lyrics/providers/`: LRCLIB, Unison, LRCMux, NetEase and QQ Music clients (the last two use unofficial endpoints through `Spicetify.CosmosAsync`), LRC parsing, sync ranking.
+- `src/utils/Lyrics/providers/`: lrc.red, LRCLIB, Unison, LRCMux, NetEase and QQ Music clients (the last two use unofficial endpoints through `Spicetify.CosmosAsync`), LRC parsing, sync ranking.
 - `src/utils/Lyrics/providers/ProviderOrder.ts`: the default order, provider labels, and how a saved priority list becomes the providers to ask.
 - `src/utils/Lyrics/fetchLyrics.ts`: provider order and fallback around the Spicy API call.
 - `src/utils/Lyrics/providers/Genius.ts`, `workers/genius-proxy/worker.js`: the Genius client and the Cloudflare Worker it talks to.

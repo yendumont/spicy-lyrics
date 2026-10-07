@@ -7,6 +7,7 @@ import {
   $geniusProxyUrl,
   $lyricsProvider,
   $lyricsProviderFallback,
+  $lrcRedWordSync,
   $lyricsProviderOrder,
   $lyricsProvidersDisabled,
 } from "../../stores.ts";
@@ -14,6 +15,7 @@ import { toImageUrl } from "./CoverMatch.ts";
 import { fetchFromGenius } from "./Genius.ts";
 import { fetchFromLrcLib } from "./LrcLib.ts";
 import { fetchFromLrcMux } from "./LrcMux.ts";
+import { fetchFromLrcRed } from "./LrcRed.ts";
 import { fetchFromNetEase } from "./NetEase.ts";
 import { fetchFromQQMusic } from "./QQMusic.ts";
 import { fetchFromUnison } from "./Unison.ts";
@@ -28,6 +30,7 @@ const logger = new Logger("Lyrics Providers");
 const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | null>> = {
   lrclib: fetchFromLrcLib,
   lrcmux: fetchFromLrcMux,
+  lrcred: (track) => fetchFromLrcRed(track, $lrcRedWordSync.get()),
   netease: fetchFromNetEase,
   qqmusic: fetchFromQQMusic,
   unison: fetchFromUnison,

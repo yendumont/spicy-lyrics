@@ -1,4 +1,4 @@
-export type ExternalProviderId = "lrclib" | "unison" | "netease" | "qqmusic" | "genius" | "lrcmux";
+export type ExternalProviderId = "lrclib" | "unison" | "netease" | "qqmusic" | "genius" | "lrcmux" | "lrcred";
 export type LyricsProviderId = "spicy" | ExternalProviderId;
 
 /** What the external providers look a track up by. Duration is in milliseconds. */

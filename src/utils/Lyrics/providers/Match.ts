@@ -45,6 +45,13 @@ export type MatchOptions = {
   relaxedVersions?: boolean;
   /** Other names the playing track's artist is known to appear under (see GeniusAliases). */
   artistAliases?: string[];
+  /** The title must equal ours once decoration is ignored; "Progress" is not "Work in Progress (Intro)". */
+  exactTitle?: boolean;
+  /**
+   * How near a result's length must be for it to count with no matching artist. Lyrics with
+   * exact timing are wrong for another song, so a tighter figure than the default suits them.
+   */
+  closeDurationMs?: number;
 };
 
 function versionTags(title: string): string[] {
@@ -409,13 +416,16 @@ export function rankCandidates<T extends Candidate>(
     if (wrongVersion(c.title, wanted, options)) continue;
 
     const forms = titleForms(c.title);
-    if (!ours.some((own) => forms.some((form) => namesMatch(own, form)))) continue;
+    const titleOk = options.exactTitle
+      ? ours.some((own) => forms.includes(own))
+      : ours.some((own) => forms.some((form) => namesMatch(own, form)));
+    if (!titleOk) continue;
 
     const artistOk =
       c.artists.some((a) => namesMatch(artist, normalizeName(a))) ||
       matchesAlias(c.artists, options.artistAliases);
     // Artists are often spelled differently (script, aliases); accept a near-exact length instead.
-    if (!artistOk && !(known && diff <= CLOSE_DURATION_DIFF_MS)) continue;
+    if (!artistOk && !(known && diff <= (options.closeDurationMs ?? CLOSE_DURATION_DIFF_MS))) continue;
 
     scored.push({
       candidate: c,

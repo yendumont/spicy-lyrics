@@ -6,6 +6,7 @@ import type { LyricsProviderId } from "./types.ts";
  */
 export const DEFAULT_ORDER: LyricsProviderId[] = [
   "spicy",
+  "lrcred",
   "unison",
   "lrclib",
   "lrcmux",
@@ -17,6 +18,7 @@ export const DEFAULT_ORDER: LyricsProviderId[] = [
 export const PROVIDER_LABELS: Record<LyricsProviderId, string> = {
   spicy: "Spicy Lyrics",
   unison: "Unison",
+  lrcred: "lrc.red",
   lrclib: "LRCLIB",
   lrcmux: "LRCMux",
   netease: "NetEase",

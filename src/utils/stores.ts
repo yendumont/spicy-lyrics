@@ -77,6 +77,10 @@ export const $geniusProxyUrl = persistAtom<string>("geniusProxyUrl", "");
 // by default: it only does anything once a Genius proxy URL is set, and it prefers
 // returning nothing to guessing.
 export const $geniusLooseSearch = persistAtom<boolean>("geniusLooseSearch", true);
+// lrc.red times many songs' words with its own model, which can be inaccurate (the site
+// says so on the song page). "hand": word sync only where a person timed it; "all":
+// word sync wherever the file has it; "off": line sync only.
+export const $lrcRedWordSync = persistAtom<string>("lrcRedWordSync", "hand");
 // Genius only: when nothing proved a match, show the best-looking result anyway (a close
 // title, written the same way, by an obscure rather than famous page). Prefers showing
 // lyrics to showing none, so it can occasionally show the wrong song. On by default.

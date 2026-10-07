@@ -6,6 +6,7 @@ import {
   $geniusLooseSearch,
   $geniusProxyUrl,
   $lineHoverBackground,
+  $lrcRedWordSync,
   $lyricsProvider,
   $lyricsProviderFallback,
   $lyricsProviderOrder,
@@ -20,6 +21,8 @@ import { matches, PriorityList, Row, Select, SectionTitle, TextInput, Toggle } f
 
 const SECTION_NAME = "Lyrics Display";
 const renderingTypeOptions = ["calculate", "animate"];
+const lrcRedWordSyncOptions = ["hand", "all", "off"];
+const lrcRedWordSyncLabels = ["Hand-timed only", "All word sync", "No word sync"];
 
 interface Props {
   query: string;
@@ -41,6 +44,7 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const geniusLooseSearch = useStore($geniusLooseSearch);
   const geniusFavoriteArtists = useStore($geniusFavoriteArtists);
   const geniusEagerMatch = useStore($geniusEagerMatch);
+  const lrcRedWordSync = useStore($lrcRedWordSync);
 
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
 
@@ -61,7 +65,9 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
 
   const r11 = matches(query, "Genius Eager Matching", "When nothing proves which Genius page is right, show the best-looking one anyway instead of no lyrics.");
 
-  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10 && !r11) return null;
+  const r12 = matches(query, "lrc.red Word Sync", "How much of lrc.red's word-by-word timing to use. Many of its songs are timed by its own model, which can be inaccurate.");
+
+  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10 && !r11 && !r12) return null;
 
   return (
     <>
@@ -113,6 +119,20 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
           disabledReason="Enable Provider Fallback to modify this setting"
         >
           <Toggle checked={preferBestSync} onChange={(v) => $preferBestSync.set(v)} />
+        </Row>
+      )}
+
+      {r12 && (
+        <Row
+          label="lrc.red Word Sync"
+          description="How much of lrc.red's word-by-word timing to use. Many of its songs are timed by its own model, not by hand, and the model can be inaccurate (lrc.red says so on those songs' pages). Hand-timed only keeps word sync where a person timed it and uses line sync elsewhere; the other providers can then supply word sync instead."
+        >
+          <Select
+            value={lrcRedWordSync}
+            options={lrcRedWordSyncOptions}
+            labels={lrcRedWordSyncLabels}
+            onChange={(v) => $lrcRedWordSync.set(v)}
+          />
         </Row>
       )}
 

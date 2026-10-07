@@ -230,6 +230,29 @@ Check the Worker in a browser: `https://<your-worker>/search?q=hello` should ret
 If it returns an error such as `genius responded 403`, Genius is blocking Cloudflare's
 servers and the fallback will not work; clear the setting.
 
+## Local files and podcasts (experiment)
+
+Settings → Experiments → **Lyrics for Local Files & Podcasts** (off by default). When on,
+local files (`spotify:local:`) and audio podcast episodes are looked up like songs, with
+every enabled provider asked in your priority order even with Provider Fallback off.
+
+The artist is guessed from the title (`providers/Unlisted.ts`): file tags first (split on
+`;` and `/`), then "Artist - Song", "Song - Artist", "Song by Artist", `Artist-Song`, runs
+of underscores read as " - ", and the names after `ft`/`prod` as artists, after stripping
+extensions, track numbers and credit tails. Up to six guesses are tried per provider; the
+first that matches (title, artist, duration) wins, so word- and line-synced providers are
+preferred just as for normal songs.
+
+Spicy's own API needs a Spotify track id, so `providers/SpotifySearch.ts` first finds the
+catalogue track: it searches Spotify's own search (GraphQL `searchModalResults`, no Web API
+rate limit) and accepts a track whose title and artist match and whose length is within 10 s
+of the file's. With no artist to vouch for it, an exact title match within 2 s is accepted.
+If nothing fits, Spicy is skipped. Files with junk names (`B0CXMH1CMX`, `New_Project`),
+unreleased songs and differently cut versions still only get the other providers.
+
+Plain podcast episodes with no song in the title find nothing. Video podcasts remain
+unsupported. Takes effect from the next song. Cached under a key made from the whole uri.
+
 ## Rollback / uninstall
 
 ```powershell

@@ -64,6 +64,13 @@ export const EXPERIMENTS = [
     default: true,
     pageClass: "Exp_LyricsSkeleton",
   },
+  {
+    id: "unlistedLyrics",
+    label: "Lyrics for Local Files & Podcasts",
+    description:
+      "Looks up lyrics for songs you play from local files and for audio podcast episodes. They have no real artist on Spotify, so the artist is guessed from the title (\"Artist - Song\", \"Song by Artist\") and the lyrics providers are searched for the closest match, preferring word and line sync. Can occasionally pick the wrong song. Disable to restore the \"not supported\" notice.",
+    default: false,
+  },
 ] as const satisfies readonly Experiment[];
 
 /** A registry entry, narrowed to its literal `id` — what the UI iterates over. */
@@ -94,9 +101,9 @@ export function setExperiment(id: ExperimentId, value: boolean): void {
 
 /** Sync every experiment's `pageClass` onto the page root. Safe to call anytime. */
 export function ApplyExperimentClasses(el: HTMLElement): void {
-  for (const exp of EXPERIMENTS) {
+  for (const exp of EXPERIMENTS as readonly Experiment[]) {
     if (!exp.pageClass) continue;
-    el.classList.toggle(exp.pageClass, isExperimentEnabled(exp.id));
+    el.classList.toggle(exp.pageClass, isExperimentEnabled(exp.id as ExperimentId));
   }
 }
 

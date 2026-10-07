@@ -35,6 +35,7 @@ import { Icons } from "./components/Styling/Icons.ts";
 import Fullscreen, { EnterSpicyLyricsFullscreen, ExitFullscreenElement } from "./components/Utils/Fullscreen.ts";
 import { UpdateNowBar } from "./components/Utils/NowBar.ts";
 import { IsPlaying } from "./utils/Addons.ts";
+import { isExperimentEnabled } from "./utils/experiments.ts";
 import { requestPositionSync } from "./utils/Gets/GetProgress.ts";
 import { IntervalManager } from "./utils/IntervalManager.ts";
 import fetchLyrics from "./utils/Lyrics/fetchLyrics.ts";
@@ -473,7 +474,9 @@ async function main() {
   // not just at startup, so switching to an episode hides it again.
   const syncLyricsButtonRegistration = () => {
     if (!button) return;
-    const isTrack = SpotifyPlayer.GetContentType() === "track";
+    const contentType = SpotifyPlayer.GetContentType();
+    const isTrack =
+      contentType === "track" || (contentType === "episode" && isExperimentEnabled("unlistedLyrics"));
     if (isTrack && !button.Registered) {
       button.Button.register();
       button.Registered = true;

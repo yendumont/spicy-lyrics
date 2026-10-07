@@ -1,5 +1,13 @@
 import { isDev } from "../../components/Global/Defaults.ts";
-import { $currentLyricsData, $currentLyricsType, $currentlyFetching, $preferBestSync } from "../stores.ts";
+import {
+  $currentLyricsData,
+  $currentLyricsType,
+  $currentlyFetching,
+  $lyricsProvider,
+  $lyricsProviderOrder,
+  $lyricsProvidersDisabled,
+  $preferBestSync,
+} from "../stores.ts";
 import Platform from "../../components/Global/Platform.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import PageView, { PageContainer } from "../../components/Pages/PageView.ts";
@@ -14,14 +22,26 @@ import { GetExpireStore } from "../../modules/Store.ts";
 import { SLObjPack } from "../objpack.ts";
 import { HideLyricsSkeleton, IsLyricsSkeletonEnabled, ShowLyricsSkeleton } from "./LyricsSkeleton.ts";
 import { onExperimentChange } from "../experiments.ts";
+import { findSpotifyTrackId } from "./providers/SpotifySearch.ts";
 import {
   BEST_SYNC_RANK,
   FetchFromExternalProviders,
   GetProviderOrder,
+  GetUnlistedGuesses,
+  GetUnlistedTitles,
+  IsUnlistedItem,
+  activeProviders,
+  resolveOrder,
   SyncRank,
   type ExternalProviderId,
   type LyricsProviderId,
 } from "./providers/index.ts";
+
+const hashString = (value: string): string => {
+  let h = 5381;
+  for (let i = 0; i < value.length; i++) h = ((h << 5) + h + value.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+};
 
 const lyricsLogger = new Logger("Lyrics Pipeline");
 const lyricsCacheLogger = new Logger("Lyrics Cache");
@@ -160,8 +180,12 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     return ["unknown-track", 400];
   }
 
+  // Local files and podcast episodes (experiment): no catalogue id, so Spicy's own
+  // API is skipped and only the external providers are asked.
+  const unlisted = IsUnlistedItem(uri);
+
   const contentType = SpotifyPlayer.GetContentType();
-  if (contentType !== "track") {
+  if (contentType !== "track" && !(unlisted && contentType === "episode")) {
     $currentlyFetching.set(false);
     if (contentType === "episode") {
       return ["episode-track", 400];
@@ -169,7 +193,9 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     return ["unknown-track", 400];
   }
 
-  const trackId = uri.split(":")[2];
+  // A local file's third uri segment is its URL-encoded artist, shared by every file
+  // of theirs, so unlisted items are cached under a key made from the whole uri.
+  const trackId = unlisted ? `unlisted-${hashString(uri)}` : uri.split(":")[2];
 
   if (IsLyricsSkeletonEnabled()) ShowLyricsSkeleton();
 
@@ -219,7 +245,7 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
   // artist name), so they can't be looked up in LyricsStore or fetched from the
   // API. Bail out here — after LocalLyricsManager.get() (which serves any
   // user-uploaded TTML) but before the meaningless remote cache read.
-  if (uri.startsWith("spotify:local:")) {
+  if (uri.startsWith("spotify:local:") && !unlisted) {
     $currentlyFetching.set(false);
     return ["local-track", 400];
   }
@@ -266,7 +292,15 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
   try {
     let status = 0;
 
-    const order = GetProviderOrder();
+    // Unlisted items are matched against the catalogue first, so Spicy can serve them
+    // too; and with fallback off they still try every enabled provider, not just the first.
+    const order = unlisted
+      ? activeProviders(
+          resolveOrder($lyricsProviderOrder.get(), $lyricsProvider.get()),
+          $lyricsProvidersDisabled.get(),
+          true
+        )
+      : GetProviderOrder();
     const spicyIndex = order.indexOf("spicy");
     const isExternal = (id: LyricsProviderId): id is ExternalProviderId => id !== "spicy";
     const externalsBefore = (spicyIndex === -1 ? order : order.slice(0, spicyIndex)).filter(
@@ -369,14 +403,26 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     }
     if (spicyIndex === -1) return await finish();
 
+    // For a local file or episode, the catalogue track it matches (see SpotifySearch.ts).
+    let queryId = trackId;
+    if (unlisted) {
+      const matched = await findSpotifyTrackId(
+        GetUnlistedGuesses(),
+        () => isStaleFetch(uri),
+        GetUnlistedTitles()
+      );
+      if (!matched) return await finish();
+      queryId = matched;
+    }
+
     const runLyricsQuery = async (token: string) => {
-      lyricsLogger.debug("API lyrics query", { trackId });
+      lyricsLogger.debug("API lyrics query", { trackId: queryId });
       const queries = await Query(
         [
           {
             operation: "lyrics",
             variables: {
-              id: trackId,
+              id: queryId,
               auth: "SpicyLyrics-WebAuth",
             },
           },

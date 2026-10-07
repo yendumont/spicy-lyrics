@@ -11,7 +11,9 @@ import {
   $lyricsProviderOrder,
   $lyricsProvidersDisabled,
 } from "../../stores.ts";
+import { isExperimentEnabled } from "../../experiments.ts";
 import { toImageUrl } from "./CoverMatch.ts";
+import { unlistedCandidates, unlistedTitles } from "./Unlisted.ts";
 import { fetchFromGenius } from "./Genius.ts";
 import { fetchFromLrcLib } from "./LrcLib.ts";
 import { fetchFromLrcMux } from "./LrcMux.ts";
@@ -73,18 +75,64 @@ function GetCoverUrl(): string | undefined {
   return cover && cover !== COVER_PLACEHOLDER_URL ? toImageUrl(cover) : undefined;
 }
 
-function GetCurrentTrackInfo(): TrackInfo | null {
+/**
+ * Local files and podcast episodes: not songs in Spotify's catalogue, so Spicy's own
+ * API cannot serve them. Only handled while the experiment is on.
+ */
+export function IsUnlistedItem(uri: string | undefined): boolean {
+  if (!isExperimentEnabled("unlistedLyrics")) return false;
+  return !!uri?.startsWith("spotify:local:") || SpotifyPlayer.GetContentType() === "episode";
+}
+
+/** The readings of the playing local file or episode, for matching it against the catalogue. */
+export function GetUnlistedGuesses(): TrackInfo[] {
+  return GetCurrentTrackInfos();
+}
+
+/** The playing item's possible titles, for a match on title and length alone. */
+export function GetUnlistedTitles(): { titles: string[]; durationMs: number } {
+  const durationMs = SpotifyPlayer.GetDuration();
   const name = SpotifyPlayer.GetName();
-  const artist = SpotifyPlayer.GetArtists()?.[0]?.name;
-  if (!name || !artist) return null;
+  if (!name) return { titles: [], durationMs };
   return {
-    name,
-    artist,
-    artists: (SpotifyPlayer.GetArtists() ?? []).map((a) => a.name).filter(Boolean),
-    album: SpotifyPlayer.GetAlbumName() ?? "",
-    coverUrl: GetCoverUrl(),
-    durationMs: SpotifyPlayer.GetDuration(),
+    titles: unlistedTitles({
+      name,
+      artists: [],
+      album: "",
+      durationMs,
+    }),
+    durationMs,
   };
+}
+
+/** What to look the playing item up as: one reading for a song, several guesses for an unlisted item. */
+function GetCurrentTrackInfos(): TrackInfo[] {
+  const name = SpotifyPlayer.GetName();
+  if (!name) return [];
+
+  const uri = Spicetify?.Player?.data?.item?.uri;
+  if (IsUnlistedItem(uri)) {
+    return unlistedCandidates({
+      name,
+      artists: (SpotifyPlayer.GetArtists() ?? []).map((a) => a.name).filter(Boolean),
+      album: SpotifyPlayer.GetAlbumName() ?? "",
+      showName: SpotifyPlayer.GetShowName(),
+      durationMs: SpotifyPlayer.GetDuration(),
+    });
+  }
+
+  const artist = SpotifyPlayer.GetArtists()?.[0]?.name;
+  if (!artist) return [];
+  return [
+    {
+      name,
+      artist,
+      artists: (SpotifyPlayer.GetArtists() ?? []).map((a) => a.name).filter(Boolean),
+      album: SpotifyPlayer.GetAlbumName() ?? "",
+      coverUrl: GetCoverUrl(),
+      durationMs: SpotifyPlayer.GetDuration(),
+    },
+  ];
 }
 
 /** How well a payload is synced: word (3) > line (2) > unsynced (1) > nothing (0). */
@@ -120,8 +168,8 @@ export async function FetchFromExternalProviders(
 ): Promise<any | null> {
   if (providers.length === 0) return null;
 
-  const track = GetCurrentTrackInfo();
-  if (!track) return null;
+  const tracks = GetCurrentTrackInfos();
+  if (tracks.length === 0) return null;
 
   let best: any | null = null;
   let bestRank = floor;
@@ -129,16 +177,21 @@ export async function FetchFromExternalProviders(
   for (const id of providers) {
     if (isStale()) return null;
     if ((MAX_RANK[id] ?? BEST_SYNC_RANK) <= bestRank) continue;
-    try {
-      const lyrics = await fetchers[id](track);
-      const rank = SyncRank(lyrics);
-      if (rank > bestRank) {
-        best = lyrics;
-        bestRank = rank;
-        if (!preferBestSync || rank >= BEST_SYNC_RANK) break;
+    // A song has one reading; a local file or episode has several guesses, tried in turn.
+    for (const track of tracks) {
+      if (isStale()) return null;
+      try {
+        const lyrics = await fetchers[id](track);
+        const rank = SyncRank(lyrics);
+        if (rank > bestRank) {
+          best = lyrics;
+          bestRank = rank;
+          if (!preferBestSync || rank >= BEST_SYNC_RANK) return best;
+          break;
+        }
+      } catch (error) {
+        logger.warn(`${PROVIDER_LABELS[id]} lookup failed`, error);
       }
-    } catch (error) {
-      logger.warn(`${PROVIDER_LABELS[id]} lookup failed`, error);
     }
   }
   return best;

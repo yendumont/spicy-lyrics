@@ -1,6 +1,9 @@
 import { useStore } from "@nanostores/react";
 import React from "react";
 import {
+  $geniusFavoriteArtists,
+  $geniusLooseSearch,
+  $geniusProxyUrl,
   $lineHoverBackground,
   $lyricsProvider,
   $lyricsProviderFallback,
@@ -9,12 +12,12 @@ import {
   $simpleLyricsMode,
   $simpleLyricsModeRenderingType
 } from "../../../utils/stores.ts";
-import { matches, Row, Select, SectionTitle, Toggle } from "./components.tsx";
+import { matches, Row, Select, SectionTitle, TextInput, Toggle } from "./components.tsx";
 
 const SECTION_NAME = "Lyrics Display";
 const renderingTypeOptions = ["calculate", "animate"];
-const providerOptions = ["spicy", "unison", "lrclib", "netease", "qqmusic"];
-const providerLabels = ["Spicy Lyrics", "Unison", "LRCLIB", "NetEase", "QQ Music"];
+const providerOptions = ["spicy", "unison", "lrclib", "netease", "qqmusic", "genius"];
+const providerLabels = ["Spicy Lyrics", "Unison", "LRCLIB", "NetEase", "QQ Music", "Genius"];
 
 interface Props {
   query: string;
@@ -29,6 +32,9 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const lyricsProvider = useStore($lyricsProvider);
   const lyricsProviderFallback = useStore($lyricsProviderFallback);
   const preferBestSync = useStore($preferBestSync);
+  const geniusProxyUrl = useStore($geniusProxyUrl);
+  const geniusLooseSearch = useStore($geniusLooseSearch);
+  const geniusFavoriteArtists = useStore($geniusFavoriteArtists);
 
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
 
@@ -36,12 +42,18 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const r2 = matches(query, "Simple Mode: Text Animation Style", "How lyrics text transitions are rendered in Simple Lyrics Mode.");
   const r3 = matches(query, "Minimal Lyrics Mode", "Hides sung lyrics lines in Fullscreen and Cinema Mode");
   const r4 = matches(query, "Line Hover Background", "Shows a highlight box behind a lyrics line when you hover over it");
-  const r5 = matches(query, "Lyrics Provider", "Which service lyrics are fetched from first: Spicy Lyrics, Unison, LRCLIB, NetEase or QQ Music.");
+  const r5 = matches(query, "Lyrics Provider", "Which service lyrics are fetched from first: Spicy Lyrics, Unison, LRCLIB, NetEase, QQ Music or Genius.");
   const r6 = matches(query, "Provider Fallback", "When the chosen lyrics provider has nothing for a song, try the other providers in turn.");
 
   const r7 = matches(query, "Prefer Best Sync", "Keep asking providers past a worse-synced result and show the best one: word sync over line sync over unsynced.");
 
-  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7) return null;
+  const r8 = matches(query, "Genius Proxy URL", "Address of your own Cloudflare Worker, needed for the Genius lyrics provider.");
+
+  const r9 = matches(query, "Genius Loose Search", "When Genius finds nothing for the exact song and artist, search more broadly and use the closest match.");
+
+  const r10 = matches(query, "Genius Favourite Artists", "Real artists whose songs you have under other people's names, for finding leaked and fan-uploaded songs on Genius.");
+
+  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10) return null;
 
   return (
     <>
@@ -81,6 +93,41 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
           disabledReason="Enable Provider Fallback to modify this setting"
         >
           <Toggle checked={preferBestSync} onChange={(v) => $preferBestSync.set(v)} />
+        </Row>
+      )}
+
+      {r8 && (
+        <Row
+          label="Genius Proxy URL"
+          description="Needed for the Genius lyrics provider: the address of your own Cloudflare Worker (see RUNBOOK.md). Genius gives unsynced text only, and is tried last unless you pick it first. Without an address it finds nothing."
+        >
+          <TextInput
+            value={geniusProxyUrl}
+            placeholder="https://your-worker.workers.dev"
+            onCommit={(v) => $geniusProxyUrl.set(v)}
+          />
+        </Row>
+      )}
+
+      {r9 && (
+        <Row
+          label="Genius Loose Search"
+          description="Genius only. For leaked and fan-uploaded songs: when the exact song and artist find nothing, search more broadly and use a result with the same cover art, a related artist, or an artist your library has already resolved. Gives up rather than guess a famous song of the same name, but can occasionally pick the wrong one."
+        >
+          <Toggle checked={geniusLooseSearch} onChange={(v) => $geniusLooseSearch.set(v)} />
+        </Row>
+      )}
+
+      {r10 && (
+        <Row
+          label="Genius Favourite Artists"
+          description="Genius only. Real artists whose songs you have in your library under someone else's name, separated by commas (for example: jaydes, yuke). When Spotify's artist is an unknown uploader, Genius is searched for these artists too, and their song with the same title is used. It also learns these by itself after a few confirmed matches."
+        >
+          <TextInput
+            value={geniusFavoriteArtists}
+            placeholder="artist one, artist two"
+            onCommit={(v) => $geniusFavoriteArtists.set(v)}
+          />
         </Row>
       )}
 

@@ -84,6 +84,43 @@ export function Select({
   );
 }
 
+/** Single-line text field. Keeps edits local and commits on blur or Enter. */
+export function TextInput({
+  value,
+  placeholder,
+  onCommit,
+}: {
+  value: string;
+  placeholder?: string;
+  onCommit: (v: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next !== value) onCommit(next);
+  };
+
+  return (
+    <input
+      type="text"
+      className="sl-sp-select sl-sp-text"
+      value={draft}
+      placeholder={placeholder}
+      spellCheck={false}
+      onChange={(e) => setDraft(e.currentTarget.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+    />
+  );
+}
+
 /**
  * Bipolar position slider — a snapping range control centred on a neutral
  * point with a negative axis to the left and a positive axis to the right.

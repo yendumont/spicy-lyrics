@@ -92,6 +92,63 @@ live-reload helper. The install script removes that helper from your config.
    **Lyrics Provider**, **Provider Fallback** and **Prefer Best Sync**.
 3. Play a song. The credit under the lyrics reads "Provided by: ..." with the source.
 
+## Genius fallback (optional)
+
+Genius is a provider in the **Lyrics Provider** list, last in the default order. With
+**Provider Fallback** on it is therefore asked only after every other provider came up
+empty (it gives unsynced text, so it is skipped once anything better is found). You can
+also choose it as the first provider. It needs the proxy URL below; without one it finds
+nothing.
+
+Genius cannot be reached from Spotify directly (no CORS headers, and Spicetify's own
+proxy refuses it), so you run a small Cloudflare Worker that fetches Genius for you.
+The Worker is in `workers/genius-proxy/worker.js`. It serves only Genius search and
+Genius lyrics pages, only to Spotify's page, and holds no secrets.
+
+1. Make a free account at dash.cloudflare.com (no domain needed).
+2. **Workers & Pages**, **Create**, **Create Worker**. Name it (for example
+   `spicy-genius`) and click **Deploy**.
+3. **Edit code**, replace everything with the contents of `workers/genius-proxy/worker.js`,
+   click **Deploy**.
+4. Copy the address (like `https://spicy-genius.yourname.workers.dev`).
+5. In Spotify: Spicy Lyrics, Settings, Lyrics Display, **Genius Proxy URL**, paste it, press
+   Enter. Then pick **Genius** under **Lyrics Provider** if you want it first.
+
+**Genius Loose Search** (Settings, Lyrics Display, off by default) widens Genius lookups
+for leaked or fan-uploaded songs, where Spotify's artist is an uploader and Genius lists
+the real artist and a decorated title. Normally a result must match the song title and
+artist. With it on, a miss triggers broader searches (title alone with deeper results,
+other word orders, with the album). A result is used when:
+
+1. its title is close and its cover art is the same picture as the playing song's, or
+2. its title is close and its artist resembles the Spotify artist (or a learned alias), or
+3. its title is long and unusual (12+ letters) and it is the only such result, or
+4. last resort: its title is exact, Genius has never heard of the Spotify artist (so it is
+   probably an uploader), and the result is by the only artist, among those with an exact
+   title match, that your library has already resolved behind uploader names in 3+ songs.
+
+It never takes a longer title for a shorter one ("On Me" is not "Easy On Me") and never
+prefers a result for being famous, so it will often return nothing rather than guess.
+
+**Learned artists.** When a cover match proves that a Spotify artist is a Genius artist
+(for example "Yen" is "jaydes"), the pairing is remembered in `SL:geniusAliases` and used for
+that artist's later songs: they are searched for under the real name, which also finds songs
+the bare title buries. Separately, `SL:geniusArtists` counts which Genius artists have turned
+up behind uploader names (once per song); rule 4 above uses it, and searches for those artists
+by name, because Genius's own search buries obscure songs under famous ones of the same title.
+Loose search is on by default and does nothing until a proxy URL is set. To forget what it
+learned, run `Spicetify.LocalStorage.remove("SL:geniusAliases")` and
+`Spicetify.LocalStorage.remove("SL:geniusArtists")` in Spotify's DevTools.
+
+**Updating the Worker.** The Worker now also accepts `per_page` and `page` on `/search`.
+Loose search asks for 20 results on the bare-title search; with an older Worker it still
+works but sees only the top five. To update, open the Worker in Cloudflare, **Edit code**,
+replace everything with `workers/genius-proxy/worker.js`, **Deploy**.
+
+Check the Worker in a browser: `https://<your-worker>/search?q=hello` should return JSON.
+If it returns an error such as `genius responded 403`, Genius is blocking Cloudflare's
+servers and the fallback will not work; clear the setting.
+
 ## Rollback / uninstall
 
 ```powershell
@@ -129,3 +186,4 @@ install script.
 - `scripts/update-fork.ps1`: merge upstream, then call the install script.
 - `src/utils/Lyrics/providers/`: LRCLIB, Unison, NetEase and QQ Music clients (the last two use unofficial endpoints through `Spicetify.CosmosAsync`), LRC parsing, sync ranking.
 - `src/utils/Lyrics/fetchLyrics.ts`: provider order and fallback around the Spicy API call.
+- `src/utils/Lyrics/providers/Genius.ts`, `workers/genius-proxy/worker.js`: the Genius client and the Cloudflare Worker it talks to.

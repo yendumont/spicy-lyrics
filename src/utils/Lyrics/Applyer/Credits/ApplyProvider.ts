@@ -7,6 +7,7 @@ const ProviderMap = {
     "unison": "Unison",
     "netease": "NetEase",
     "qqmusic": "QQ Music",
+    "genius": "Genius",
 } as const;
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {

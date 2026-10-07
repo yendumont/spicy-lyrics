@@ -449,6 +449,17 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
     }
   }
 
+  /* Text field: the select's surface, but typeable */
+  .sl-sp-text {
+    width: 260px;
+    max-width: 100%;
+    cursor: text;
+
+    &::placeholder {
+      color: var(--color-text-secondary);
+    }
+  }
+
   /* Bipolar position slider — a recessed groove (matching the toggle's dark
      slot) with a fill that grows out from the centre tick toward the thumb,
      plus a value readout and an inline Reset. */

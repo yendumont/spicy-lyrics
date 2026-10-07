@@ -1,6 +1,14 @@
-import { SpotifyPlayer } from "../../../components/Global/SpotifyPlayer.ts";
+import { COVER_PLACEHOLDER_URL, SpotifyPlayer } from "../../../components/Global/SpotifyPlayer.ts";
 import Logger from "../../Logger.ts";
-import { $lyricsProvider, $lyricsProviderFallback } from "../../stores.ts";
+import {
+  $geniusFavoriteArtists,
+  $geniusLooseSearch,
+  $geniusProxyUrl,
+  $lyricsProvider,
+  $lyricsProviderFallback,
+} from "../../stores.ts";
+import { toImageUrl } from "./CoverMatch.ts";
+import { fetchFromGenius } from "./Genius.ts";
 import { fetchFromLrcLib } from "./LrcLib.ts";
 import { fetchFromNetEase } from "./NetEase.ts";
 import { fetchFromQQMusic } from "./QQMusic.ts";
@@ -17,15 +25,34 @@ export const PROVIDER_LABELS: Record<LyricsProviderId, string> = {
   lrclib: "LRCLIB",
   netease: "NetEase",
   qqmusic: "QQ Music",
+  genius: "Genius",
 };
 
-const DEFAULT_ORDER: LyricsProviderId[] = ["spicy", "unison", "lrclib", "netease", "qqmusic"];
+// Genius is last: it only has unsynced text, so with fallback on it is a last resort.
+const DEFAULT_ORDER: LyricsProviderId[] = ["spicy", "unison", "lrclib", "netease", "qqmusic", "genius"];
 
 const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | null>> = {
   lrclib: fetchFromLrcLib,
   netease: fetchFromNetEase,
   qqmusic: fetchFromQQMusic,
   unison: fetchFromUnison,
+  // Needs the user's own proxy (see Genius.ts); with none set it returns nothing.
+  genius: (track) =>
+    fetchFromGenius(
+      track,
+      $geniusProxyUrl.get(),
+      $geniusLooseSearch.get(),
+      $geniusFavoriteArtists
+        .get()
+        .split(/[,\n]/)
+        .map((name) => name.trim())
+        .filter(Boolean)
+    ),
+};
+
+/** The best sync rank a provider can ever return. One that cannot beat what is already held is not asked. */
+const MAX_RANK: Partial<Record<ExternalProviderId, number>> = {
+  genius: 1,
 };
 
 /**
@@ -40,6 +67,12 @@ export function GetProviderOrder(): LyricsProviderId[] {
   return [primary, ...DEFAULT_ORDER.filter((id) => id !== primary)];
 }
 
+/** The playing item's cover as an https URL, or undefined when it only has the placeholder. */
+function GetCoverUrl(): string | undefined {
+  const cover = SpotifyPlayer.GetCover("standard");
+  return cover && cover !== COVER_PLACEHOLDER_URL ? toImageUrl(cover) : undefined;
+}
+
 function GetCurrentTrackInfo(): TrackInfo | null {
   const name = SpotifyPlayer.GetName();
   const artist = SpotifyPlayer.GetArtists()?.[0]?.name;
@@ -47,7 +80,9 @@ function GetCurrentTrackInfo(): TrackInfo | null {
   return {
     name,
     artist,
+    artists: (SpotifyPlayer.GetArtists() ?? []).map((a) => a.name).filter(Boolean),
     album: SpotifyPlayer.GetAlbumName() ?? "",
+    coverUrl: GetCoverUrl(),
     durationMs: SpotifyPlayer.GetDuration(),
   };
 }
@@ -93,6 +128,7 @@ export async function FetchFromExternalProviders(
 
   for (const id of providers) {
     if (isStale()) return null;
+    if ((MAX_RANK[id] ?? BEST_SYNC_RANK) <= bestRank) continue;
     try {
       const lyrics = await fetchers[id](track);
       const rank = SyncRank(lyrics);

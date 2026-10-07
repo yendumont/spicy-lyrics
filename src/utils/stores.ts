@@ -60,10 +60,21 @@ export const $simpleLyricsModeRenderingType = persistAtom<string>(
   "calculate"
 );
 export const $minimalLyricsMode = persistAtom<boolean>("minimalLyricsMode", false);
-// Which source is asked for lyrics first: "spicy" | "unison" | "lrclib" | "netease" | "qqmusic".
+// Which source is asked for lyrics first: "spicy" | "unison" | "lrclib" | "netease" | "qqmusic" | "genius".
 export const $lyricsProvider = persistAtom<string>("lyricsProvider", "spicy");
 // When the chosen source has nothing, try the remaining ones in turn.
 export const $lyricsProviderFallback = persistAtom<boolean>("lyricsProviderFallback", true);
+// Base URL of the user's own Genius proxy (workers/genius-proxy), which the "genius"
+// provider needs. Empty means Genius finds nothing.
+export const $geniusProxyUrl = persistAtom<string>("geniusProxyUrl", "");
+// Genius only: when the exact song and artist find nothing, search more broadly and
+// use a result backed by evidence (same cover, related or already-resolved artist). On
+// by default: it only does anything once a Genius proxy URL is set, and it prefers
+// returning nothing to guessing.
+export const $geniusLooseSearch = persistAtom<boolean>("geniusLooseSearch", true);
+// Genius only: real artists whose songs the listener has under other people's names
+// (comma-separated). Stands in for the learned library until enough songs are matched.
+export const $geniusFavoriteArtists = persistAtom<string>("geniusFavoriteArtists", "");
 // Keep asking providers past a worse-synced hit (word > line > unsynced) and show the best.
 export const $preferBestSync = persistAtom<boolean>("preferBestSync", true);
 // Tinted box drawn behind a lyrics line while the pointer is over it.

@@ -108,7 +108,8 @@ async function isModelTimed(isrc: string): Promise<boolean | null> {
   }
 }
 
-async function lyricsFor(isrc: string, track: TrackInfo, wordSync: LrcRedWordSync): Promise<any | null> {
+/** One lrc.red song's lyrics by ISRC, with the word-sync policy applied. Also used by BiniLyrics, which relays lrc.red. */
+export async function lyricsFor(isrc: string, track: TrackInfo, wordSync: LrcRedWordSync): Promise<any | null> {
   const ttml = await get(`${BASE}/s/${encodeURIComponent(isrc)}.ttml`);
   if (ttml.status !== 404) {
     let parsed = parseTTML(asITunesTiming(await ttml.text()));

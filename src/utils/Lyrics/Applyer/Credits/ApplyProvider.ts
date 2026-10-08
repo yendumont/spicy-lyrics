@@ -1,7 +1,10 @@
 const ProviderMap = {
     "spt": "Spotify",
+    // Before "aml": a source name is matched by what it contains, and "amll" contains "aml".
+    "amll": "AMLL TTML DB",
     "aml": "Apple Music",
     "spl": "Spicy Lyrics",
+    "youtubemusic": "YouTube Music",
     "ldb": "Local DB",
     "lrclib": "LRCLIB",
     "unison": "Unison",
@@ -11,6 +14,8 @@ const ProviderMap = {
     "lrcmux": "LRCMux",
     "lrcred": "lrc.red",
     "kugou": "KuGou",
+    "kuwo": "Kuwo",
+    "binilyrics": "BiniLyrics",
     "deezer": "Deezer",
     "musixmatch": "Musixmatch",
 } as const;

@@ -7,6 +7,8 @@ import type { LyricsProviderId } from "./types.ts";
 export const DEFAULT_ORDER: LyricsProviderId[] = [
   "spicy",
   "lrcred",
+  "amll",
+  "binilyrics",
   "musixmatch",
   "unison",
   "lrclib",
@@ -14,7 +16,9 @@ export const DEFAULT_ORDER: LyricsProviderId[] = [
   "netease",
   "qqmusic",
   "kugou",
+  "kuwo",
   "deezer",
+  "ytmusic",
   "genius",
 ];
 
@@ -29,6 +33,10 @@ export const PROVIDER_LABELS: Record<LyricsProviderId, string> = {
   kugou: "KuGou",
   deezer: "Deezer",
   musixmatch: "Musixmatch",
+  amll: "AMLL TTML DB",
+  ytmusic: "YouTube Music",
+  kuwo: "Kuwo",
+  binilyrics: "BiniLyrics",
   genius: "Genius",
 };
 

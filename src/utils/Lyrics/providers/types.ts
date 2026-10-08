@@ -8,7 +8,11 @@ export type ExternalProviderId =
   | "lrcred"
   | "kugou"
   | "deezer"
-  | "musixmatch";
+  | "musixmatch"
+  | "amll"
+  | "ytmusic"
+  | "kuwo"
+  | "binilyrics";
 export type LyricsProviderId = "spicy" | ExternalProviderId;
 
 /** What the external providers look a track up by. Duration is in milliseconds. */

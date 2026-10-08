@@ -31,7 +31,7 @@ type NetEaseLyric = {
 
 const MAX_CANDIDATES = 3;
 
-async function findSongs(track: TrackInfo): Promise<{ id: number; durationMs: number }[]> {
+export async function findSongs(track: TrackInfo): Promise<{ id: number; durationMs: number }[]> {
   const res = await getViaCosmos(
     buildUrl(`${BASE}/search/get`, {
       s: `${track.name} ${track.artist}`,

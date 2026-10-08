@@ -156,7 +156,7 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
       {r8 && (
         <Row
           label="Genius Proxy URL"
-          description="Needed for the Genius lyrics provider: the address of your own Cloudflare Worker (see RUNBOOK.md). Genius gives unsynced text only, and is tried last unless you pick it first. Without an address it finds nothing."
+          description="Needed for the Genius and YouTube Music lyrics providers: the address of your own Cloudflare Worker (see RUNBOOK.md; redeploy it after an update to get YouTube Music). Both give unsynced text only, and are tried last unless you pick them first. Without an address they find nothing."
         >
           <TextInput
             value={geniusProxyUrl}

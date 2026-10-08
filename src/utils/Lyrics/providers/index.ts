@@ -17,6 +17,10 @@ import { toImageUrl } from "./CoverMatch.ts";
 import { unlistedCandidates, unlistedTitles } from "./Unlisted.ts";
 import { RecordOutcome, RecordResult } from "./LookupReport.ts";
 import { fetchFromGenius } from "./Genius.ts";
+import { fetchFromAmllTtmlDb } from "./AmllTtmlDb.ts";
+import { fetchFromBiniLyrics } from "./BiniLyrics.ts";
+import { fetchFromKuwo } from "./Kuwo.ts";
+import { fetchFromYouTubeMusic } from "./YouTubeMusic.ts";
 import { fetchFromDeezer } from "./Deezer.ts";
 import { fetchFromKugou } from "./Kugou.ts";
 import { fetchFromMusixmatch } from "./Musixmatch.ts";
@@ -34,6 +38,8 @@ export { DEFAULT_ORDER, PROVIDER_LABELS, activeProviders, resolveOrder } from ".
 
 const logger = new Logger("Lyrics Providers");
 
+const asWordSync = (value: string): "hand" | "all" | "off" => (value === "all" || value === "off" ? value : "hand");
+
 const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | null>> = {
   lrclib: fetchFromLrcLib,
   lrcmux: fetchFromLrcMux,
@@ -42,6 +48,11 @@ const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | n
   qqmusic: fetchFromQQMusic,
   kugou: fetchFromKugou,
   deezer: fetchFromDeezer,
+  amll: fetchFromAmllTtmlDb,
+  kuwo: fetchFromKuwo,
+  binilyrics: (track) => fetchFromBiniLyrics(track, asWordSync($lrcRedWordSync.get())),
+  // Goes through the listener's own Worker (see YouTubeMusic.ts); with none set it finds nothing.
+  ytmusic: (track) => fetchFromYouTubeMusic(track, $geniusProxyUrl.get()),
   // Needs the listener's own token (see Musixmatch.ts); with none it finds nothing.
   musixmatch: (track) => fetchFromMusixmatch(track, $musixmatchToken.get()),
   unison: fetchFromUnison,
@@ -63,6 +74,7 @@ const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | n
 /** The best sync rank a provider can ever return. One that cannot beat what is already held is not asked. */
 const MAX_RANK: Partial<Record<ExternalProviderId, number>> = {
   genius: 1,
+  ytmusic: 1,
   deezer: 2,
 };
 

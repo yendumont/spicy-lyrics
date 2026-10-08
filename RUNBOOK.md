@@ -178,6 +178,32 @@ All three are unofficial endpoints and sit just above Genius in the default prio
   asks for word-timed richsync, then line-timed subtitles, then plain text, and matches by
   the Spotify track id where the song has one. Not verified against a real token.
 
+## AMLL TTML DB and YouTube Music
+
+- **AMLL TTML DB** (`providers/AmllTtmlDb.ts`): the community database of word-timed lyrics
+  (`amll-dev/amll-ttml-db`), read straight from GitHub's raw files (open CORS, no key). Files
+  are filed by streaming-service id: the Spotify id first (local files and episodes are
+  matched to one the same way as for Spicy Lyrics), then the song's NetEase id. Parsed with
+  the same TTML parser as lrc.red, so it is word-synced. Sits right after lrc.red.
+- **YouTube Music** (`providers/YouTubeMusic.ts`): unsynced text (LyricFind or Musixmatch,
+  named in the credit). YouTube Music cannot be reached from Spotify's page, so it uses the
+  **same Cloudflare Worker as Genius**, which now also answers `/ytm/search` and
+  `/ytm/lyrics`. **Redeploy the Worker** with `workers/genius-proxy/worker.js` to enable it
+  (see the next section); the "Genius Proxy URL" setting is shared. Tested against a local
+  copy of the Worker; not yet against Cloudflare itself.
+- **Kuwo** (`providers/Kuwo.ts`): Kuwo's website API (`kuwo.cn/openapi/v1/www`), line-synced.
+  Kuwo also has word-timed lyrics, but as an encrypted binary that Spicetify's proxy cannot
+  carry, so they are not used. The `Title - Artist` header, credit lines, the translation
+  licence notice and bare speaker labels ("DaBaby：") are dropped.
+- **BiniLyrics** (`providers/BiniLyrics.ts`): `lyrics-api.binimum.org`, open and keyless,
+  returns TTML. Many of its answers are lrc.red files, which go through the lrc.red
+  provider's rules, so "lrc.red Word Sync" applies. It overlaps heavily with lrc.red; it
+  only adds songs in its own library.
+- **Not added:** *YouTube transcripts*: YouTube now serves caption files only with a
+  proof-of-origin token, so they come back empty without pretending to be another
+  YouTube client. *RMM Revival*: it has no public documentation (its domain redirects to a
+  Roblox game page) and only relays Spicy Lyrics' own data, which this fork already asks.
+
 ## Genius fallback (optional)
 
 Genius is a provider in the **Lyrics Provider Priority** list, last in the default order. With

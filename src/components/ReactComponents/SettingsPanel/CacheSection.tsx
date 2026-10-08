@@ -4,6 +4,7 @@ import {
   RemoveCurrentLyrics_StateCache,
   RemoveLyricsCache,
 } from "../../../utils/LyricsCacheTools.ts";
+import { ClearChosenSourceForCurrentSong } from "../../../utils/LyricsSourceTools.ts";
 import { matches, Row, SectionTitle } from "./components.tsx";
 
 const SECTION_NAME = "Cache";
@@ -20,7 +21,9 @@ export default function CacheSection({ query, sectionFilter }: Props) {
   const r2 = matches(query, "Clear Stored Lyrics Cache", "Delete lyrics that have been cached for up to 3 days.");
   const r3 = matches(query, "Clear Current Song from Internal State", "Remove the current song's lyrics from the in-memory state only.");
 
-  if (!r1 && !r2 && !r3) return null;
+  const r4 = matches(query, "Clear Chosen Source for Current Song", "Un-pin the lyrics source you picked for this song. The other clear buttons never do this.");
+
+  if (!r1 && !r2 && !r3 && !r4) return null;
 
   return (
     <>
@@ -52,6 +55,17 @@ export default function CacheSection({ query, sectionFilter }: Props) {
         >
           <button className="sl-sp-btn" onClick={() => RemoveCurrentLyrics_StateCache(true)}>
             Clear State
+          </button>
+        </Row>
+      )}
+
+      {r4 && (
+        <Row
+          label="Clear Chosen Source for Current Song"
+          description="Un-pin the lyrics source you picked for this song and its saved lyrics. The buttons above never do this, and this never touches them."
+        >
+          <button className="sl-sp-btn" onClick={() => ClearChosenSourceForCurrentSong(true)}>
+            Clear
           </button>
         </Row>
       )}

@@ -67,6 +67,9 @@ export const $lyricsProvider = persistAtom<string>("lyricsProvider", "spicy");
 // they switched off. Empty means the built-in order.
 export const $lyricsProviderOrder = persistAtom<string[]>("lyricsProviderOrder", []);
 export const $lyricsProvidersDisabled = persistAtom<string[]>("lyricsProvidersDisabled", []);
+// Songs the listener pinned to one source: track uri -> provider id. Kept apart from the
+// lyrics cache on purpose, so clearing caches never un-pins a song.
+export const $lyricsProviderPicks = persistAtom<Record<string, string>>("lyricsProviderPicks", {});
 // When the chosen source has nothing, try the remaining ones in turn.
 export const $lyricsProviderFallback = persistAtom<boolean>("lyricsProviderFallback", true);
 // Base URL of the user's own Genius proxy (workers/genius-proxy), which the "genius"

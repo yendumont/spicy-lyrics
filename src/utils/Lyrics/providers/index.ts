@@ -14,6 +14,7 @@ import {
 import { isExperimentEnabled } from "../../experiments.ts";
 import { toImageUrl } from "./CoverMatch.ts";
 import { unlistedCandidates, unlistedTitles } from "./Unlisted.ts";
+import { RecordOutcome, RecordResult } from "./LookupReport.ts";
 import { fetchFromGenius } from "./Genius.ts";
 import { fetchFromLrcLib } from "./LrcLib.ts";
 import { fetchFromLrcMux } from "./LrcMux.ts";
@@ -151,6 +152,17 @@ export function SyncRank(lyrics: any): number {
 
 export const BEST_SYNC_RANK = 3;
 
+/** One provider's best answer for the playing song (its guesses tried in turn), or null. */
+export async function FetchFromProvider(id: ExternalProviderId): Promise<any | null> {
+  let best: any | null = null;
+  for (const track of GetCurrentTrackInfos()) {
+    const lyrics = await fetchers[id](track);
+    if (SyncRank(lyrics) > SyncRank(best)) best = lyrics;
+    if (SyncRank(best) >= BEST_SYNC_RANK) break;
+  }
+  return best;
+}
+
 /**
  * Ask the external providers in turn and return a lyrics payload, or null.
  *
@@ -174,24 +186,34 @@ export async function FetchFromExternalProviders(
   let best: any | null = null;
   let bestRank = floor;
 
+  const uri = SpotifyPlayer.GetUri();
+
   for (const id of providers) {
     if (isStale()) return null;
     if ((MAX_RANK[id] ?? BEST_SYNC_RANK) <= bestRank) continue;
+    let returned: any | null = null;
+    let failed = false;
     // A song has one reading; a local file or episode has several guesses, tried in turn.
     for (const track of tracks) {
       if (isStale()) return null;
       try {
         const lyrics = await fetchers[id](track);
-        const rank = SyncRank(lyrics);
-        if (rank > bestRank) {
-          best = lyrics;
-          bestRank = rank;
-          if (!preferBestSync || rank >= BEST_SYNC_RANK) return best;
-          break;
-        }
+        if (SyncRank(lyrics) > SyncRank(returned)) returned = lyrics;
+        if (returned && SyncRank(returned) > bestRank) break;
       } catch (error) {
+        failed = true;
         logger.warn(`${PROVIDER_LABELS[id]} lookup failed`, error);
       }
+    }
+    if (uri) {
+      if (returned) RecordResult(uri, id, returned);
+      else RecordOutcome(uri, id, { state: failed ? "error" : "notfound" });
+    }
+    const rank = SyncRank(returned);
+    if (rank > bestRank) {
+      best = returned;
+      bestRank = rank;
+      if (!preferBestSync || rank >= BEST_SYNC_RANK) return best;
     }
   }
   return best;

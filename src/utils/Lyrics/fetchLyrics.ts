@@ -23,6 +23,8 @@ import { SLObjPack } from "../objpack.ts";
 import { HideLyricsSkeleton, IsLyricsSkeletonEnabled, ShowLyricsSkeleton } from "./LyricsSkeleton.ts";
 import { onExperimentChange } from "../experiments.ts";
 import { findSpotifyTrackId } from "./providers/SpotifySearch.ts";
+import { BeginReport, RecordOutcome, RecordResult } from "./providers/LookupReport.ts";
+import { FetchFromSource, PickFor, PickKey, PickStore } from "./providers/Sources.ts";
 import {
   BEST_SYNC_RANK,
   FetchFromExternalProviders,
@@ -207,6 +209,8 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
   // of theirs, so unlisted items are cached under a key made from the whole uri.
   const trackId = unlisted ? `unlisted-${hashString(uri)}` : uri.split(":")[2];
 
+  BeginReport(uri);
+
   if (IsLyricsSkeletonEnabled()) ShowLyricsSkeleton();
 
   if (LyricsContent) {
@@ -249,6 +253,45 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     $currentLyricsData.set(JSON.stringify(lyricsData));
     presentLyrics(lyricsData);
     return [lyricsData, 200];
+  }
+
+  // A song the listener pinned to one source: that source's lyrics, kept in a store of
+  // their own (see Sources.ts) so no cache-clearing button disturbs the choice.
+  const pickedSource = PickFor(uri);
+  if (pickedSource) {
+    const pickKey = PickKey(uri);
+    let picked: any | undefined;
+    try {
+      picked = await PickStore.GetItem(pickKey);
+    } catch (error) {
+      lyricsCacheLogger.error("Error reading the pinned lyrics", error);
+    }
+
+    if (!picked && navigator.onLine) {
+      ShowLoaderContainer(uri);
+      try {
+        const fresh = await FetchFromSource(uri, pickedSource, () => isStaleFetch(uri));
+        if (fresh) {
+          await ProcessLyrics(fresh);
+          if (!IsEmptyLyrics(fresh)) {
+            fresh.uri = uri;
+            picked = fresh;
+            await PickStore.SetItem(pickKey, fresh).catch(() => undefined);
+          }
+        }
+      } catch (error) {
+        lyricsLogger.warn("The pinned source failed", error);
+      }
+    }
+
+    if (picked) {
+      const pinned = { ...picked, uri };
+      if (isStaleFetch(uri)) return [{ ...pinned, fromCache: true }, 200];
+      $currentLyricsData.set(JSON.stringify(pinned));
+      presentLyrics(pinned);
+      return [{ ...pinned, fromCache: true }, 200];
+    }
+    lyricsLogger.warn("The pinned source has no lyrics for this song; using the automatic order");
   }
 
   // Local files have no real track id (uri.split(":")[2] is the URL-encoded
@@ -467,7 +510,10 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
         () => isStaleFetch(uri),
         GetUnlistedTitles()
       );
-      if (!matched) return await finish();
+      if (!matched) {
+        RecordOutcome(uri, "spicy", { state: "notfound" });
+        return await finish();
+      }
       queryId = matched;
     }
 
@@ -561,8 +607,10 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
 
     if (status !== 200) {
       if (status === 404) {
+        RecordOutcome(uri, "spicy", { state: "notfound" });
         return await finish();
       }
+      RecordOutcome(uri, "spicy", { state: "error" });
       // A hiccup on Spicy's side must not throw away lyrics another provider already found.
       if (candidate) return await finish();
       if (status === 429) {
@@ -580,9 +628,11 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     const lyrics = lyricsPacker.unpack(lyricsQuery.data) as any;
 
     if (lyrics === null || lyrics === undefined || lyrics === "") {
+      RecordOutcome(uri, "spicy", { state: "notfound" });
       return await finish();
     }
 
+    RecordResult(uri, "spicy", lyrics);
     return await finish(lyrics);
     }
   } catch (error) {

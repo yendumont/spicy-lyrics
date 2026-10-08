@@ -87,6 +87,16 @@ function presentLyrics(lyricsData: any): void {
 export type FetchLyricsResult = [object | string, number, string?] | null;
 
 /**
+ * Told when a search that is still running after its first result was shown finds
+ * better lyrics. Set by the applier, which fetchLyrics cannot import (it imports us).
+ */
+let upgradeHandler: ((result: FetchLyricsResult) => void) | null = null;
+export const SetLyricsUpgradeHandler = (handler: (result: FetchLyricsResult) => void): void => {
+  upgradeHandler = handler;
+};
+const NotifyLyricsUpgrade = (result: FetchLyricsResult): void => upgradeHandler?.(result);
+
+/**
  * The uri of the fetch currently in flight, or `null`.
  *
  * A second request for the SAME uri is de-duplicated — the one already running
@@ -352,20 +362,43 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     // The best payload found so far, not yet committed. With "prefer best sync"
     // off, any hit is final; with it on, only word-synced lyrics are, and a
     // lesser hit waits while the remaining providers are asked for something better.
+    //
+    // The first hit is not held back, though: it is shown at once, and the search goes
+    // on in the background. Anything better that turns up replaces it on screen.
     const preferBestSync = $preferBestSync.get();
     const isFinal = (lyrics: any) => !preferBestSync || SyncRank(lyrics) >= BEST_SYNC_RANK;
+
+    /** Rank of what is on screen. Only something above it is worth considering. */
+    let shownRank = 0;
+    /** True once the rest of the search runs after the first result was returned. */
+    let background = false;
+    const floor = () => Math.max(SyncRank(candidate), shownRank);
     const consider = (lyrics: any) => {
-      if (SyncRank(lyrics) > SyncRank(candidate)) candidate = lyrics;
+      if (SyncRank(lyrics) > floor()) candidate = lyrics;
     };
     const askExternals = async (ids: ExternalProviderId[]) =>
       consider(
-        await FetchFromExternalProviders(
-          ids,
-          () => isStaleFetch(uri),
-          SyncRank(candidate),
-          preferBestSync
-        )
+        await FetchFromExternalProviders(ids, () => isStaleFetch(uri), floor(), preferBestSync)
       );
+
+    /**
+     * Commit a payload and note what is now showing. In the background the result
+     * has no caller to return to, so the screen is told to swap to it.
+     */
+    const publish = async (lyrics: any): Promise<[object | string, number] | null> => {
+      const committed = await commitLyrics(lyrics);
+      if (!committed) return null;
+      shownRank = SyncRank(lyrics);
+      candidate = null;
+      if (background) NotifyLyricsUpgrade([committed[0], committed[1], uri]);
+      return committed;
+    };
+
+    /** Run the remainder of the search after the caller already has lyrics to show. */
+    const continueInBackground = (run: () => Promise<unknown>) => {
+      background = true;
+      void run().catch((error) => lyricsLogger.warn("Background lyrics search failed", error));
+    };
 
     /**
      * Wrap up: take `spicy` (if Spicy had lyrics) into account, ask the providers
@@ -374,9 +407,25 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
      */
     const finish = async (spicy?: any): Promise<[object | string, number]> => {
       consider(spicy);
-      if (!(candidate && isFinal(candidate))) await askExternals(externalsAfter);
+
+      // Show a lesser hit now and look for a better one afterwards.
+      if (candidate && !isFinal(candidate)) {
+        const first = await publish(candidate);
+        if (first) {
+          const searchOn = async () => {
+            await askExternals(externalsAfter);
+            if (candidate) await publish(candidate);
+          };
+          if (background) await searchOn();
+          else continueInBackground(searchOn);
+          return first;
+        }
+        candidate = null;
+      }
+
+      if (!candidate) await askExternals(externalsAfter);
       if (candidate) {
-        const committed = await commitLyrics(candidate);
+        const committed = await publish(candidate);
         if (committed) return committed;
         candidate = null;
       }
@@ -396,13 +445,20 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     };
 
     await askExternals(externalsBefore);
-    if (candidate && isFinal(candidate)) {
-      const committed = await commitLyrics(candidate);
-      if (committed) return committed;
+    if (candidate) {
+      // Final, or a lesser hit shown now while the rest of the search carries on.
+      const committed = await publish(candidate);
+      if (committed) {
+        if (!isFinal(committed[0])) continueInBackground(() => (spicyIndex === -1 ? finish() : spicyPhase()));
+        return committed;
+      }
       candidate = null;
     }
     if (spicyIndex === -1) return await finish();
+    return await spicyPhase();
 
+    /** Spicy's own API, then whatever comes after it in the list. */
+    async function spicyPhase(): Promise<[object | string, number]> {
     // For a local file or episode, the catalogue track it matches (see SpotifySearch.ts).
     let queryId = trackId;
     if (unlisted) {
@@ -485,7 +541,8 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
 
     status = lyricsQuery.httpStatus;
 
-    if (status === 503 && isStaleFetch(uri)) {
+    // Lyrics are already showing: a queued answer must not put the queue loader over them.
+    if (status === 503 && (background || isStaleFetch(uri))) {
       // The user already moved on. Entering the queued state now would put the
       // queue loader up over the new track, with nothing left to take it down.
       return ["lyrics-queued", 503];
@@ -527,6 +584,7 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     }
 
     return await finish(lyrics);
+    }
   } catch (error) {
     if (salvage) {
       const rescued = await salvage();

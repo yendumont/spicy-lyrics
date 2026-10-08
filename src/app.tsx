@@ -38,7 +38,7 @@ import { IsPlaying } from "./utils/Addons.ts";
 import { isExperimentEnabled } from "./utils/experiments.ts";
 import { requestPositionSync } from "./utils/Gets/GetProgress.ts";
 import { IntervalManager } from "./utils/IntervalManager.ts";
-import fetchLyrics from "./utils/Lyrics/fetchLyrics.ts";
+import fetchLyrics, { SetLyricsUpgradeHandler } from "./utils/Lyrics/fetchLyrics.ts";
 import ApplyLyrics from "./utils/Lyrics/Global/Applyer.ts";
 import { ScrollingIntervalTime } from "./utils/Lyrics/lyrics.ts";
 import { ScrollToActiveLine } from "./utils/Scrolling/ScrollToActiveLine.ts";
@@ -796,6 +796,10 @@ async function main() {
       }
     }
     Global.Event.listen("playback:songchange", onSongChange);
+    // A lyrics search that carries on after its first result was shown swaps better lyrics in.
+    SetLyricsUpgradeHandler((result) => {
+      void ApplyLyrics(result);
+    });
 
     const _initStaticBgMode = $staticBackgroundMode.get();
     if (

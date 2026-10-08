@@ -11,6 +11,7 @@ import {
   $lyricsProviderFallback,
   $lyricsProviderOrder,
   $lyricsProvidersDisabled,
+  $musixmatchToken,
   $preferBestSync,
   $minimalLyricsMode,
   $simpleLyricsMode,
@@ -45,6 +46,7 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const geniusFavoriteArtists = useStore($geniusFavoriteArtists);
   const geniusEagerMatch = useStore($geniusEagerMatch);
   const lrcRedWordSync = useStore($lrcRedWordSync);
+  const musixmatchToken = useStore($musixmatchToken);
 
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
 
@@ -67,7 +69,9 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
 
   const r12 = matches(query, "lrc.red Word Sync", "How much of lrc.red's word-by-word timing to use. Many of its songs are timed by its own model, which can be inaccurate.");
 
-  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10 && !r11 && !r12) return null;
+  const r13 = matches(query, "Musixmatch Token", "Your own Musixmatch user token, needed for the Musixmatch lyrics provider.");
+
+  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10 && !r11 && !r12 && !r13) return null;
 
   return (
     <>
@@ -132,6 +136,19 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
             options={lrcRedWordSyncOptions}
             labels={lrcRedWordSyncLabels}
             onChange={(v) => $lrcRedWordSync.set(v)}
+          />
+        </Row>
+      )}
+
+      {r13 && (
+        <Row
+          label="Musixmatch Token"
+          description="Needed for the Musixmatch provider: your own Musixmatch user token. Musixmatch gives apps without one a blank token, so with this empty Musixmatch finds nothing. Stored only in this extension's settings and sent only to Musixmatch."
+        >
+          <TextInput
+            value={musixmatchToken}
+            placeholder="paste your token"
+            onCommit={(v) => $musixmatchToken.set(v.trim())}
           />
         </Row>
       )}

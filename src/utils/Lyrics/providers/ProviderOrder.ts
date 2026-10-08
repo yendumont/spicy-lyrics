@@ -7,11 +7,14 @@ import type { LyricsProviderId } from "./types.ts";
 export const DEFAULT_ORDER: LyricsProviderId[] = [
   "spicy",
   "lrcred",
+  "musixmatch",
   "unison",
   "lrclib",
   "lrcmux",
   "netease",
   "qqmusic",
+  "kugou",
+  "deezer",
   "genius",
 ];
 
@@ -23,6 +26,9 @@ export const PROVIDER_LABELS: Record<LyricsProviderId, string> = {
   lrcmux: "LRCMux",
   netease: "NetEase",
   qqmusic: "QQ Music",
+  kugou: "KuGou",
+  deezer: "Deezer",
+  musixmatch: "Musixmatch",
   genius: "Genius",
 };
 

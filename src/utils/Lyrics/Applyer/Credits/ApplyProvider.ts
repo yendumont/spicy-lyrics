@@ -10,6 +10,9 @@ const ProviderMap = {
     "genius": "Genius",
     "lrcmux": "LRCMux",
     "lrcred": "lrc.red",
+    "kugou": "KuGou",
+    "deezer": "Deezer",
+    "musixmatch": "Musixmatch",
 } as const;
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {

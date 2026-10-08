@@ -10,12 +10,16 @@ import {
   $lrcRedWordSync,
   $lyricsProviderOrder,
   $lyricsProvidersDisabled,
+  $musixmatchToken,
 } from "../../stores.ts";
 import { isExperimentEnabled } from "../../experiments.ts";
 import { toImageUrl } from "./CoverMatch.ts";
 import { unlistedCandidates, unlistedTitles } from "./Unlisted.ts";
 import { RecordOutcome, RecordResult } from "./LookupReport.ts";
 import { fetchFromGenius } from "./Genius.ts";
+import { fetchFromDeezer } from "./Deezer.ts";
+import { fetchFromKugou } from "./Kugou.ts";
+import { fetchFromMusixmatch } from "./Musixmatch.ts";
 import { fetchFromLrcLib } from "./LrcLib.ts";
 import { fetchFromLrcMux } from "./LrcMux.ts";
 import { fetchFromLrcRed } from "./LrcRed.ts";
@@ -36,6 +40,10 @@ const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | n
   lrcred: (track) => fetchFromLrcRed(track, $lrcRedWordSync.get()),
   netease: fetchFromNetEase,
   qqmusic: fetchFromQQMusic,
+  kugou: fetchFromKugou,
+  deezer: fetchFromDeezer,
+  // Needs the listener's own token (see Musixmatch.ts); with none it finds nothing.
+  musixmatch: (track) => fetchFromMusixmatch(track, $musixmatchToken.get()),
   unison: fetchFromUnison,
   // Needs the user's own proxy (see Genius.ts); with none set it returns nothing.
   genius: (track) =>
@@ -55,6 +63,7 @@ const fetchers: Record<ExternalProviderId, (track: TrackInfo) => Promise<any | n
 /** The best sync rank a provider can ever return. One that cannot beat what is already held is not asked. */
 const MAX_RANK: Partial<Record<ExternalProviderId, number>> = {
   genius: 1,
+  deezer: 2,
 };
 
 /**
@@ -130,6 +139,7 @@ function GetCurrentTrackInfos(): TrackInfo[] {
       artist,
       artists: (SpotifyPlayer.GetArtists() ?? []).map((a) => a.name).filter(Boolean),
       album: SpotifyPlayer.GetAlbumName() ?? "",
+      spotifyId: SpotifyPlayer.GetId(),
       coverUrl: GetCoverUrl(),
       durationMs: SpotifyPlayer.GetDuration(),
     },

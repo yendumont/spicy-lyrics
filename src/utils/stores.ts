@@ -72,6 +72,9 @@ export const $lyricsProvidersDisabled = persistAtom<string[]>("lyricsProvidersDi
 export const $lyricsProviderPicks = persistAtom<Record<string, string>>("lyricsProviderPicks", {});
 // When the chosen source has nothing, try the remaining ones in turn.
 export const $lyricsProviderFallback = persistAtom<boolean>("lyricsProviderFallback", true);
+// The listener's own Musixmatch user token. Musixmatch gives anonymous clients a blank
+// one, so without this the Musixmatch provider finds nothing.
+export const $musixmatchToken = persistAtom<string>("musixmatchToken", "");
 // Base URL of the user's own Genius proxy (workers/genius-proxy), which the "genius"
 // provider needs. Empty means Genius finds nothing.
 export const $geniusProxyUrl = persistAtom<string>("geniusProxyUrl", "");

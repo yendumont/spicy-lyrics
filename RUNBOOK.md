@@ -160,6 +160,24 @@ Timing is whatever the source has. Measured against Spicy's word sync for the sa
 ran from about 120 ms early to 270 ms late depending on the song, and LRCLIB lines about 190 ms
 early, so no single offset corrects them. Use the global playback offset setting to nudge a song.
 
+## KuGou, Deezer and Musixmatch
+
+All three are unofficial endpoints and sit just above Genius in the default priority
+(Musixmatch above Unison); a saved priority list gets them slotted in automatically.
+
+- **KuGou** (`providers/Kugou.ts`): `lyrics.kugou.com`, no login. Word-timed KRC when it
+  has it (base64, XOR with a fixed key, zlib), else line-timed LRC. The song header line
+  and credit lines are dropped. Its search is picky about case, so lower-case forms of the
+  title are tried too.
+- **Deezer** (`providers/Deezer.ts`): public search, then Deezer's own GraphQL (`pipe.deezer.com`)
+  with the anonymous token every visitor gets. Line-timed lyrics, or plain text. The token
+  is passed as `?access_token=` because Spicetify's proxy drops request headers.
+- **Musixmatch** (`providers/Musixmatch.ts`): needs **your own user token**, pasted at
+  Settings → Lyrics Display → Musixmatch Token. Without one it does nothing (Musixmatch
+  hands anonymous clients a blank token that only matches the wrong songs). With one it
+  asks for word-timed richsync, then line-timed subtitles, then plain text, and matches by
+  the Spotify track id where the song has one. Not verified against a real token.
+
 ## Genius fallback (optional)
 
 Genius is a provider in the **Lyrics Provider Priority** list, last in the default order. With

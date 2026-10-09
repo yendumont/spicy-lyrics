@@ -280,6 +280,36 @@ export default {
       }
     }
 
+    // Genius refuses its normal lyrics pages to Cloudflare's addresses (403), but still serves
+    // the song's embed script, which carries the same lyrics. With the song id the extension
+    // sends, that is used first and wrapped as the lyrics container the extension reads.
+    if (url.pathname === "/lyrics" && /^\d{1,12}$/.test(url.searchParams.get("id") ?? "")) {
+      const path = url.searchParams.get("path") ?? "";
+      if (!LYRICS_PATH.test(path)) return reply({ error: "bad path" }, 400);
+      try {
+        const res = await fetch(`https://genius.com/songs/${url.searchParams.get("id")}/embed.js`, {
+          headers: { "User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9" },
+          cf: { cacheEverything: true, cacheTtl: CACHE_SECONDS },
+        });
+        if (res.ok) {
+          const script = await res.text();
+          const literal = /JSON\.parse\('((?:[^'\\]|\\.)*)'\)/s.exec(script)?.[1];
+          if (literal) {
+            // The script's single-quoted JavaScript string holds a JSON string of the page's HTML.
+            const json = literal.replace(/\\(.)/gs, (_, c) => (c === "n" ? "\n" : c === "u" ? "\\u" : c));
+            const html = JSON.parse(json);
+            const body = /<div class="rg_embed_body">([\s\S]*?)<\/div>\s*(?:<div class="rg_embed_footer"|$)/.exec(html)?.[1] ?? html;
+            return new Response(`<div data-lyrics-container="true">${body}</div>`, {
+              status: 200,
+              headers: { ...corsHeaders(), "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600" },
+            });
+          }
+        }
+      } catch {
+        // Fall through to the page itself.
+      }
+    }
+
     if (url.pathname === "/motion") {
       const id = url.searchParams.get("id") ?? "";
       if (/^\d{5,12}$/.test(id)) {
@@ -336,19 +366,43 @@ export default {
       return reply({ error: "not found" }, 404);
     }
 
+    const wantsJson = url.pathname === "/search" || url.pathname === "/referents";
+    const headers = {
+      "User-Agent": USER_AGENT,
+      "Accept-Language": "en-US,en;q=0.9",
+      Accept: wantsJson ? "application/json" : "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+    };
+
+    // Genius answers a first visit to a page with a redirect to the same address that sets a
+    // cookie, and a Worker keeps no cookies, so following redirects blindly loops. They are
+    // followed here by hand, carrying the cookies along.
+    const cookies = new Map();
     let upstream;
     try {
-      upstream = await fetch(target, {
-        headers: {
-          "User-Agent": USER_AGENT,
-          "Accept-Language": "en-US,en;q=0.9",
-          Accept: url.pathname === "/search" || url.pathname === "/referents" ? "application/json" : "text/html",
-        },
-        // Cloudflare-only: keep Genius's answer for a day so repeat plays do not hit it again.
-        cf: { cacheEverything: true, cacheTtl: CACHE_SECONDS },
-      });
-    } catch {
-      return reply({ error: "could not reach genius" }, 502);
+      let next = target;
+      for (let hop = 0; hop < 5; hop++) {
+        const sent = { ...headers };
+        if (cookies.size) sent.Cookie = [...cookies].map(([k, v]) => `${k}=${v}`).join("; ");
+        upstream = await fetch(next, {
+          headers: sent,
+          redirect: "manual",
+          // Cloudflare-only: keep Genius's answer for a day so repeat plays do not hit it again.
+          cf: { cacheEverything: true, cacheTtl: CACHE_SECONDS },
+        });
+        const where = upstream.headers.get("Location");
+        if (upstream.status < 300 || upstream.status >= 400 || !where) break;
+        for (const line of upstream.headers.getAll?.("Set-Cookie") ?? [upstream.headers.get("Set-Cookie") ?? ""]) {
+          const pair = line.split(";")[0];
+          const eq = pair.indexOf("=");
+          if (eq > 0) cookies.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+        }
+        const resolved = new URL(where, next);
+        // Never leave Genius.
+        if (resolved.hostname !== "genius.com" && !resolved.hostname.endsWith(".genius.com")) break;
+        next = resolved.href;
+      }
+    } catch (e) {
+      return reply({ error: `could not reach genius: ${String(e?.message ?? e).slice(0, 120)}` }, 502);
     }
 
     if (!upstream.ok) return reply({ error: `genius responded ${upstream.status}` }, 502);

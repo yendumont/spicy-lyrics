@@ -1,4 +1,4 @@
-import Logger from "../../Logger.ts";
+﻿import Logger from "../../Logger.ts";
 import { parsePlainToStatic } from "./Lrc.ts";
 import { COVER_SAME_MAX_DISTANCE, coverDistance } from "./CoverMatch.ts";
 import { knownAliases, learnAlias, libraryArtists, noteArtist } from "./GeniusAliases.ts";
@@ -408,8 +408,9 @@ async function libraryPick(
   );
 }
 
-async function lyricsAt(base: string, path: string): Promise<any | null> {
-  const res = await get(`${base}/lyrics?path=${encodeURIComponent(path)}`);
+async function lyricsAt(base: string, path: string, id?: number): Promise<any | null> {
+  // With the song id the Worker reads the embed script, which Genius still serves to it.
+  const res = await get(`${base}/lyrics?path=${encodeURIComponent(path)}${id ? `&id=${id}` : ""}`);
   if (res.status === 404) return null;
 
   const text = extractLyrics(await res.text());
@@ -481,7 +482,7 @@ export async function fetchFromGenius(
 
   for (const pick of await strictPicks(base, track)) {
     tried.add(pick.path);
-    const lyrics = await lyricsAt(base, pick.path);
+    const lyrics = await lyricsAt(base, pick.path, pick.id);
     if (lyrics) {
       commitPick(track, pick);
       return lyrics;
@@ -490,7 +491,7 @@ export async function fetchFromGenius(
 
   if (loose) {
     for (const pick of await loosePicks(base, track, tried, favorites, eager)) {
-      const lyrics = await lyricsAt(base, pick.path);
+      const lyrics = await lyricsAt(base, pick.path, pick.id);
       if (lyrics) {
         logger.debug("Genius loose match used", pick.path, pick.how);
         commitPick(track, pick);

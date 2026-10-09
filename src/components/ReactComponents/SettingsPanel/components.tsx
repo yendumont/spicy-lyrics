@@ -149,13 +149,85 @@ export function PriorityList({
   const toggle = (id: string) =>
     onChange(order, disabled.includes(id) ? disabled.filter((other) => other !== id) : [...disabled, id]);
 
+  // Drag and drop: `from` is the row being dragged, `over` the slot it would land in
+  // (0 to order.length, a position between rows), shown as a line.
+  const [from, setFrom] = React.useState<number | null>(null);
+  const [over, setOver] = React.useState<number | null>(null);
+
+  const drop = () => {
+    if (from !== null && over !== null) {
+      // Removing the dragged row shifts every slot below it up by one.
+      const target = over > from ? over - 1 : over;
+      if (target !== from) {
+        const next = [...order];
+        const [moved] = next.splice(from, 1);
+        next.splice(target, 0, moved);
+        onChange(next, disabled);
+      }
+    }
+    setFrom(null);
+    setOver(null);
+  };
+
   return (
-    <div className="sl-sp-provider-list">
+    <div className="sl-sp-provider-list" onDragLeave={(e) => {
+      // Only when the pointer leaves the whole list, not when it passes between rows.
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(null);
+    }}>
       {order.map((id, index) => {
         const name = labels[id] ?? id;
         const off = disabled.includes(id);
+        const classes = [
+          "sl-sp-provider",
+          off ? "sl-sp-provider--off" : "",
+          from === index ? "sl-sp-provider--dragging" : "",
+          from !== null && over === index ? "sl-sp-provider--drop-before" : "",
+          from !== null && over === order.length && index === order.length - 1 ? "sl-sp-provider--drop-after" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
         return (
-          <div key={id} className={`sl-sp-provider${off ? " sl-sp-provider--off" : ""}`}>
+          <div
+            key={id}
+            className={classes}
+            onDragOver={(e) => {
+              if (from === null) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              // The upper half of a row means "before it", the lower half "after it".
+              const rect = e.currentTarget.getBoundingClientRect();
+              setOver(e.clientY < rect.top + rect.height / 2 ? index : index + 1);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              drop();
+            }}
+          >
+            <span
+              className="sl-sp-provider-handle"
+              draggable
+              role="img"
+              aria-label={`Drag to move ${name}`}
+              title="Drag to reorder"
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", id);
+                // Drag the whole row, not just the dots.
+                const row = e.currentTarget.parentElement;
+                if (row) e.dataTransfer.setDragImage(row, 16, row.clientHeight / 2);
+                setFrom(index);
+              }}
+              onDragEnd={() => {
+                setFrom(null);
+                setOver(null);
+              }}
+            >
+              <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true">
+                {[2, 8, 14].flatMap((y) =>
+                  [2, 8].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.4" fill="currentColor" />)
+                )}
+              </svg>
+            </span>
             <span className="sl-sp-provider-rank">{index + 1}</span>
             <span className="sl-sp-provider-name">{name}</span>
             <button

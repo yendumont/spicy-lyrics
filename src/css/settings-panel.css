@@ -468,6 +468,53 @@ sl-generic-modal.SpicyLyricsModal .sl-modal-overlay {
     transition: opacity var(--dur-fast) var(--ease-standard);
   }
 
+  /* Drag handle (six dots), and the row states while one is being dragged */
+  .sl-sp-provider-handle {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 2px;
+    color: var(--color-text-secondary);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+
+    &:hover {
+      color: var(--color-text-primary);
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  .sl-sp-provider {
+    position: relative;
+  }
+
+  .sl-sp-provider--dragging {
+    opacity: 0.4;
+  }
+
+  .sl-sp-provider--drop-before::before,
+  .sl-sp-provider--drop-after::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--color-text-primary);
+    pointer-events: none;
+  }
+
+  .sl-sp-provider--drop-before::before {
+    top: calc(var(--space-2) / -2 - 1px);
+  }
+
+  .sl-sp-provider--drop-after::after {
+    bottom: calc(var(--space-2) / -2 - 1px);
+  }
+
   .sl-sp-provider--off .sl-sp-provider-name,
   .sl-sp-provider--off .sl-sp-provider-rank {
     opacity: 0.4;

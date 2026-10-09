@@ -1,7 +1,7 @@
 import { isDev } from "../../../components/Global/Defaults.ts";
 import { GetExpireStore } from "../../../modules/Store.ts";
 import Logger from "../../Logger.ts";
-import { EXTRA_ATTRIBUTE, clearExtras, flatten, type AppliedLine } from "./LineElements.ts";
+import { addExtra, clearExtras, flatten, type AppliedLine } from "./LineElements.ts";
 
 const logger = new Logger("Translation");
 
@@ -143,9 +143,8 @@ export function decorateTranslations(lines: AppliedLine[], translations: string[
 
     const el = document.createElement("div");
     el.className = "LineTranslation";
-    el.setAttribute(EXTRA_ATTRIBUTE, "translation");
     el.textContent = text;
-    line.el.appendChild(el);
+    addExtra("translation", line.el, el);
   });
 }
 

@@ -1,5 +1,5 @@
 import { PageContainer } from "../../../components/Pages/PageView.ts";
-import { EXTRA_ATTRIBUTE, clearExtras, type AppliedLine } from "./LineElements.ts";
+import { addExtra, clearExtras, type AppliedLine } from "./LineElements.ts";
 import type { Meaning } from "./Meanings.ts";
 
 const CARD_ID = "SpicyLyricsMeaningCard";
@@ -121,8 +121,7 @@ const INFO_ICON =
 /** Mark the lines that have meanings, each with a button that opens them. */
 export function decorateMeanings(lines: AppliedLine[], byLine: Map<number, Meaning[]>): void {
   // Redecorating replaces every button; a card open on one closes with it (see openMeaningCard).
-  clearExtras("meaning");
-  PageContainer?.querySelectorAll(".line.HasMeaning").forEach((el) => el.classList.remove("HasMeaning"));
+  clearExtras("meaning", "HasMeaning");
 
   for (const [index, meanings] of byLine) {
     const line = lines[index];
@@ -132,7 +131,6 @@ export function decorateMeanings(lines: AppliedLine[], byLine: Map<number, Meani
     const button = document.createElement("button");
     button.type = "button";
     button.className = "LineMeaningBtn";
-    button.setAttribute(EXTRA_ATTRIBUTE, "meaning");
     button.setAttribute("aria-label", "What this line means");
     button.title = "What this line means";
     button.innerHTML = INFO_ICON;
@@ -142,12 +140,11 @@ export function decorateMeanings(lines: AppliedLine[], byLine: Map<number, Meani
       e.preventDefault();
       openMeaningCard(button, meanings);
     });
-    line.el.appendChild(button);
+    addExtra("meaning", line.el, button);
   }
 }
 
 export function removeMeanings(): void {
   closeMeaningCard();
-  clearExtras("meaning");
-  PageContainer?.querySelectorAll(".line.HasMeaning").forEach((el) => el.classList.remove("HasMeaning"));
+  clearExtras("meaning", "HasMeaning");
 }

@@ -56,9 +56,31 @@ export function appliedLines(type: "Syllable" | "Line" | "Static" | null = appli
     .filter((line) => line.text !== "");
 }
 
-/** Take everything an extra added off the lyrics lines. */
-export function clearExtras(kind: string): void {
-  PageContainer?.querySelectorAll(`[${EXTRA_ATTRIBUTE}="${kind}"]`).forEach((node) => node.remove());
+/**
+ * Everything the extras have added, by kind. The list keeps nodes that are not on the page:
+ * the lyrics list only keeps the lines in view mounted, so a line scrolled out of view holds
+ * its translation or button in a detached element, which a search of the page would miss
+ * and which would come back when the line did.
+ */
+const added = new Map<string, Set<{ node: HTMLElement; line?: HTMLElement }>>();
+
+/** Add `node` to `line` and remember it under `kind`. */
+export function addExtra(kind: string, line: HTMLElement, node: HTMLElement): void {
+  node.setAttribute(EXTRA_ATTRIBUTE, kind);
+  line.appendChild(node);
+  const list = added.get(kind) ?? new Set();
+  list.add({ node, line });
+  added.set(kind, list);
 }
 
+/** Take everything an extra added off the lyrics lines, mounted or not. */
+export function clearExtras(kind: string, markerClass?: string): void {
+  for (const { node, line } of added.get(kind) ?? []) {
+    node.remove();
+    if (markerClass) line?.classList.remove(markerClass);
+  }
+  added.delete(kind);
+  // Anything from before this list existed (or from another page instance).
+  PageContainer?.querySelectorAll(`[${EXTRA_ATTRIBUTE}="${kind}"]`).forEach((node) => node.remove());
+}
 export { flatten } from "./MeaningsCore.ts";

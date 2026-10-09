@@ -89,10 +89,13 @@ export function TextInput({
   value,
   placeholder,
   onCommit,
+  secret,
 }: {
   value: string;
   placeholder?: string;
   onCommit: (v: string) => void;
+  /** Hide what is typed, for keys and tokens. */
+  secret?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
 
@@ -107,11 +110,12 @@ export function TextInput({
 
   return (
     <input
-      type="text"
+      type={secret ? "password" : "text"}
       className="sl-sp-select sl-sp-text"
       value={draft}
       placeholder={placeholder}
       spellCheck={false}
+      autoComplete="off"
       onChange={(e) => setDraft(e.currentTarget.value)}
       onBlur={commit}
       onKeyDown={(e) => {

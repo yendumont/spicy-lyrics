@@ -75,6 +75,18 @@ export const $lyricsProviderFallback = persistAtom<boolean>("lyricsProviderFallb
 // The listener's own Musixmatch user token. Musixmatch gives anonymous clients a blank
 // one, so without this the Musixmatch provider finds nothing.
 export const $musixmatchToken = persistAtom<string>("musixmatchToken", "");
+// Line meanings: Genius's annotations shown on the lyrics lines they explain. Needs the
+// Genius Worker (see geniusProxyUrl). `lineMeaningsFrom` picks whose annotations:
+// "artist" (verified by the artist), "editors" (the artist and Genius's reviewed ones) or
+// "everyone" (including community ones nobody has reviewed yet).
+export const $lineMeanings = persistAtom<boolean>("lineMeanings", true);
+export const $lineMeaningsFrom = persistAtom<string>("lineMeaningsFrom", "editors");
+// Translation: each lyrics line translated under the original by Gemini, with the
+// listener's own API key. Off until they turn it on and give a key.
+export const $translateLyrics = persistAtom<boolean>("translateLyrics", false);
+export const $geminiApiKey = persistAtom<string>("geminiApiKey", "");
+export const $translationLanguage = persistAtom<string>("translationLanguage", "English");
+export const $geminiModel = persistAtom<string>("geminiModel", "gemini-3.5-flash-lite");
 // Base URL of the user's own Genius proxy (workers/genius-proxy), which the "genius"
 // provider needs. Empty means Genius finds nothing.
 export const $geniusProxyUrl = persistAtom<string>("geniusProxyUrl", "");

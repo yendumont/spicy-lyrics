@@ -1,7 +1,6 @@
 import Logger from "../../Logger.ts";
 import { parseTTML } from "../ttml/parser.ts";
 import { findSongs } from "./NetEase.ts";
-import { findSpotifyTrackId } from "./SpotifySearch.ts";
 import type { TrackInfo } from "./types.ts";
 
 const logger = new Logger("AMLL TTML DB");
@@ -31,14 +30,10 @@ function parse(ttml: string): any | null {
 }
 
 export async function fetchFromAmllTtmlDb(track: TrackInfo): Promise<any | null> {
-  // Songs in Spotify's catalogue are filed by their Spotify id; a local file or
-  // episode first has to be matched to one.
-  const spotifyId =
-    track.spotifyId ??
-    (await findSpotifyTrackId([track], () => false, { titles: [track.name], durationMs: track.durationMs }));
-
-  if (spotifyId) {
-    const ttml = await getTtml("spotify-lyrics", spotifyId);
+  // Songs in Spotify's catalogue are filed by their Spotify id (a local file or episode
+  // has one once it has been matched to the catalogue; see Resolve.ts).
+  if (track.spotifyId) {
+    const ttml = await getTtml("spotify-lyrics", track.spotifyId);
     const lyrics = ttml ? parse(ttml) : null;
     if (lyrics) return lyrics;
   }

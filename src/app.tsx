@@ -8,6 +8,7 @@ import "./css/ContentBox.css";
 import "./css/DynamicBG/spicy-dynamic-bg.css";
 import "./css/Lyrics/main.css";
 import "./css/Lyrics/Mixed.css";
+import "./css/Lyrics/Extras.css";
 import "./css/Loaders/LoaderContainer.css";
 import "./css/Loaders/LyricsSkeleton.css";
 import "./css/font-pack/font-pack.css";
@@ -36,6 +37,8 @@ import Fullscreen, { EnterSpicyLyricsFullscreen, ExitFullscreenElement } from ".
 import { UpdateNowBar } from "./components/Utils/NowBar.ts";
 import { IsPlaying } from "./utils/Addons.ts";
 import { isExperimentEnabled } from "./utils/experiments.ts";
+import { initLineExtras } from "./utils/Lyrics/Extras/index.ts";
+import { initAnimatedCover } from "./utils/AnimatedCover/index.ts";
 import { requestPositionSync } from "./utils/Gets/GetProgress.ts";
 import { IntervalManager } from "./utils/IntervalManager.ts";
 import fetchLyrics, { SetLyricsUpgradeHandler } from "./utils/Lyrics/fetchLyrics.ts";
@@ -796,6 +799,9 @@ async function main() {
       }
     }
     Global.Event.listen("playback:songchange", onSongChange);
+    // Line meanings and translations, added to the lyrics lines as they arrive.
+    initLineExtras();
+    initAnimatedCover();
     // A lyrics search that carries on after its first result was shown swaps better lyrics in.
     SetLyricsUpgradeHandler((result) => {
       void ApplyLyrics(result);

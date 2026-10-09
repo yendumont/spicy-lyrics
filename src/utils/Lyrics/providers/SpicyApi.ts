@@ -1,8 +1,7 @@
 import Platform from "../../../components/Global/Platform.ts";
 import { Query } from "../../API/Query.ts";
 import { SLObjPack } from "../../objpack.ts";
-import { findSpotifyTrackId } from "./SpotifySearch.ts";
-import { GetUnlistedGuesses, GetUnlistedTitles, IsUnlistedItem } from "./index.ts";
+import { IsUnlistedItem, ResolveTrack, spotifyIdOf } from "./Resolve.ts";
 
 const packer = new SLObjPack();
 
@@ -14,7 +13,7 @@ const packer = new SLObjPack();
 export async function FetchSpicyFor(uri: string, isStale: () => boolean = () => false): Promise<any | null> {
   let id: string | null | undefined = uri.split(":")[2];
   if (IsUnlistedItem(uri)) {
-    id = await findSpotifyTrackId(GetUnlistedGuesses(), isStale, GetUnlistedTitles());
+    id = spotifyIdOf(await ResolveTrack(isStale));
   }
   if (!id) return null;
 

@@ -1,6 +1,12 @@
 import { useStore } from "@nanostores/react";
 import React from "react";
 import {
+  $geminiApiKey,
+  $geminiModel,
+  $lineMeanings,
+  $lineMeaningsFrom,
+  $translateLyrics,
+  $translationLanguage,
   $geniusEagerMatch,
   $geniusFavoriteArtists,
   $geniusLooseSearch,
@@ -22,6 +28,8 @@ import { matches, PriorityList, Row, Select, SectionTitle, TextInput, Toggle } f
 
 const SECTION_NAME = "Lyrics Display";
 const renderingTypeOptions = ["calculate", "animate"];
+const meaningsFromOptions = ["artist", "editors", "everyone"];
+const meaningsFromLabels = ["Artist only", "Artist and editors", "Everyone"];
 const lrcRedWordSyncOptions = ["hand", "all", "off"];
 const lrcRedWordSyncLabels = ["Hand-timed only", "All word sync", "No word sync"];
 
@@ -47,6 +55,12 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
   const geniusEagerMatch = useStore($geniusEagerMatch);
   const lrcRedWordSync = useStore($lrcRedWordSync);
   const musixmatchToken = useStore($musixmatchToken);
+  const lineMeanings = useStore($lineMeanings);
+  const meaningsFrom = useStore($lineMeaningsFrom);
+  const translateLyrics = useStore($translateLyrics);
+  const geminiApiKey = useStore($geminiApiKey);
+  const translationLanguage = useStore($translationLanguage);
+  const geminiModel = useStore($geminiModel);
 
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
 
@@ -71,7 +85,19 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
 
   const r13 = matches(query, "Musixmatch Token", "Your own Musixmatch user token, needed for the Musixmatch lyrics provider.");
 
-  if (!r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10 && !r11 && !r12 && !r13) return null;
+  const r14 = matches(query, "Line Meanings", "Genius explanations on lyrics lines, with a button to read what a line means.");
+  const r15 = matches(query, "Meanings From", "Whose Genius explanations to show: the artist, the artist and editors, or everyone.");
+  const r16 = matches(query, "Translate Lyrics", "Show a translation under each lyrics line, made by Gemini.");
+  const r17 = matches(query, "Gemini API Key", "Your own Google Gemini API key, for translating lyrics.");
+  const r18 = matches(query, "Translate Into", "The language lyrics are translated to.");
+  const r19 = matches(query, "Gemini Model", "The Gemini model that translates lyrics.");
+
+  if (
+    !r1 && !r2 && !r3 && !r4 && !r5 && !r6 && !r7 && !r8 && !r9 && !r10 && !r11 && !r12 && !r13 &&
+    !r14 && !r15 && !r16 && !r17 && !r18 && !r19
+  ) {
+    return null;
+  }
 
   return (
     <>
@@ -195,6 +221,76 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
             value={geniusFavoriteArtists}
             placeholder="artist one, artist two"
             onCommit={(v) => $geniusFavoriteArtists.set(v)}
+          />
+        </Row>
+      )}
+
+      {r14 && (
+        <Row
+          label="Line Meanings"
+          description="Shows a small info button on lyrics lines that Genius has an explanation for; press it to read what the line means. Needs the Genius Proxy URL above (your Worker, with the line-meanings update deployed)."
+        >
+          <Toggle checked={lineMeanings} onChange={(v) => $lineMeanings.set(v)} />
+        </Row>
+      )}
+
+      {r15 && (
+        <Row
+          label="Meanings From"
+          description="Whose explanations to show. Artist only: ones the artist wrote or confirmed. Artist and editors: those plus the ones Genius's editors reviewed and approved. Everyone: also community suggestions nobody has reviewed yet, which can be wrong."
+          disabled={!lineMeanings}
+          disabledReason="Enable Line Meanings to modify this setting"
+        >
+          <Select
+            value={meaningsFrom}
+            options={meaningsFromOptions}
+            labels={meaningsFromLabels}
+            onChange={(v) => $lineMeaningsFrom.set(v)}
+            disabled={!lineMeanings}
+          />
+        </Row>
+      )}
+
+      {r16 && (
+        <Row
+          label="Translate Lyrics"
+          description="Shows a translation under each lyrics line, made by Google's Gemini with your own API key. The lyrics of each song you play are sent to Google for this (once per song and language; the result is kept for 60 days). Costs whatever your Gemini plan charges per request."
+        >
+          <Toggle checked={translateLyrics} onChange={(v) => $translateLyrics.set(v)} />
+        </Row>
+      )}
+
+      {r17 && (
+        <Row
+          label="Gemini API Key"
+          description="Your own key from Google AI Studio (aistudio.google.com). Stored only in this extension's settings and sent only to Google."
+        >
+          <TextInput secret value={geminiApiKey} placeholder="paste your key" onCommit={(v) => $geminiApiKey.set(v)} />
+        </Row>
+      )}
+
+      {r18 && (
+        <Row
+          label="Translate Into"
+          description="The language to translate to, in plain words (English, Español, 日本語…)."
+        >
+          <TextInput
+            value={translationLanguage}
+            placeholder="English"
+            onCommit={(v) => $translationLanguage.set(v || "English")}
+          />
+        </Row>
+      )}
+
+      {r19 && (
+        <Row
+          label="Gemini Model"
+          description="The model that translates. The default is the fastest and cheapest one; change it if Google retires it or your key has no access."
+        >
+          <TextInput
+            value={geminiModel}
+            placeholder="gemini-3.5-flash-lite"
+            onCommit={(v) => $geminiModel.set(v || "gemini-3.5-flash-lite")}
           />
         </Row>
       )}

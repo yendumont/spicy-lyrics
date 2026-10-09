@@ -1,44 +1,8 @@
+import { DEFAULT_ORDER, PROVIDER_LABELS } from "./registry.ts";
 import type { LyricsProviderId } from "./types.ts";
 
-/**
- * The built-in priority. Genius is last: it only has unsynced text, so with fallback
- * on it is a last resort.
- */
-export const DEFAULT_ORDER: LyricsProviderId[] = [
-  "spicy",
-  "lrcred",
-  "amll",
-  "binilyrics",
-  "musixmatch",
-  "unison",
-  "lrclib",
-  "lrcmux",
-  "netease",
-  "qqmusic",
-  "kugou",
-  "kuwo",
-  "deezer",
-  "ytmusic",
-  "genius",
-];
-
-export const PROVIDER_LABELS: Record<LyricsProviderId, string> = {
-  spicy: "Spicy Lyrics",
-  unison: "Unison",
-  lrcred: "lrc.red",
-  lrclib: "LRCLIB",
-  lrcmux: "LRCMux",
-  netease: "NetEase",
-  qqmusic: "QQ Music",
-  kugou: "KuGou",
-  deezer: "Deezer",
-  musixmatch: "Musixmatch",
-  amll: "AMLL TTML DB",
-  ytmusic: "YouTube Music",
-  kuwo: "Kuwo",
-  binilyrics: "BiniLyrics",
-  genius: "Genius",
-};
+// The providers, their order and their names live in registry.ts.
+export { DEFAULT_ORDER, PROVIDER_LABELS };
 
 const isProvider = (id: string): id is LyricsProviderId => (DEFAULT_ORDER as string[]).includes(id);
 

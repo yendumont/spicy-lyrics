@@ -1,24 +1,18 @@
-const ProviderMap = {
-    "spt": "Spotify",
-    // Before "aml": a source name is matched by what it contains, and "amll" contains "aml".
-    "amll": "AMLL TTML DB",
-    "aml": "Apple Music",
-    "spl": "Spicy Lyrics",
-    "youtubemusic": "YouTube Music",
-    "ldb": "Local DB",
-    "lrclib": "LRCLIB",
-    "unison": "Unison",
-    "netease": "NetEase",
-    "qqmusic": "QQ Music",
-    "genius": "Genius",
-    "lrcmux": "LRCMux",
-    "lrcred": "lrc.red",
-    "kugou": "KuGou",
-    "kuwo": "Kuwo",
-    "binilyrics": "BiniLyrics",
-    "deezer": "Deezer",
-    "musixmatch": "Musixmatch",
-} as const;
+import { PROVIDER_META } from "../../providers/registry.ts";
+
+// What a payload's `source` says, and the name to credit. The built-in sources are
+// Spicy's own; every other provider comes from the registry, so a new one is credited
+// without being listed here. A source name is matched by what it contains, so the
+// longest key goes first: "amll" contains "aml".
+const ProviderMap: [string, string][] = (
+  [
+    ["spt", "Spotify"],
+    ["aml", "Apple Music"],
+    ["spl", "Spicy Lyrics"],
+    ["ldb", "Local DB"],
+    ...Object.values(PROVIDER_META).map((meta): [string, string] => [meta.creditKey, meta.label]),
+  ] as [string, string][]
+).sort((a, b) => b[0].length - a[0].length);
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {
   if (!data?.source || !LyricsContainer) return;
@@ -29,7 +23,7 @@ export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): vo
   let providerLabel = "Unknown";
   if (typeof data.source === "string") {
     const source = data.source.toLowerCase();
-    const match = Object.entries(ProviderMap).find(([key]) => source.includes(key));
+    const match = ProviderMap.find(([key]) => source.includes(key));
     if (match) providerLabel = match[1];
   }
 

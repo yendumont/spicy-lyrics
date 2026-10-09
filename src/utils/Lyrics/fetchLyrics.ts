@@ -22,16 +22,15 @@ import { GetExpireStore } from "../../modules/Store.ts";
 import { SLObjPack } from "../objpack.ts";
 import { HideLyricsSkeleton, IsLyricsSkeletonEnabled, ShowLyricsSkeleton } from "./LyricsSkeleton.ts";
 import { onExperimentChange } from "../experiments.ts";
-import { findSpotifyTrackId } from "./providers/SpotifySearch.ts";
 import { BeginReport, RecordOutcome, RecordResult } from "./providers/LookupReport.ts";
 import { FetchFromSource, PickFor, PickKey, PickStore } from "./providers/Sources.ts";
 import {
   BEST_SYNC_RANK,
   FetchFromExternalProviders,
   GetProviderOrder,
-  GetUnlistedGuesses,
-  GetUnlistedTitles,
   IsUnlistedItem,
+  ResolveTrack,
+  spotifyIdOf,
   activeProviders,
   resolveOrder,
   SyncRank,
@@ -505,11 +504,8 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     // For a local file or episode, the catalogue track it matches (see SpotifySearch.ts).
     let queryId = trackId;
     if (unlisted) {
-      const matched = await findSpotifyTrackId(
-        GetUnlistedGuesses(),
-        () => isStaleFetch(uri),
-        GetUnlistedTitles()
-      );
+      // The same lookup every other provider is handed (see Resolve.ts).
+      const matched = spotifyIdOf(await ResolveTrack(() => isStaleFetch(uri)));
       if (!matched) {
         RecordOutcome(uri, "spicy", { state: "notfound" });
         return await finish();

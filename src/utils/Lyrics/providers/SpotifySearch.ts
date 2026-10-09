@@ -10,7 +10,24 @@ const MAX_DURATION_DIFF_MS = 10000;
 /** With no artist to vouch for it, a same-titled track must be this close in length. */
 const EXACT_LENGTH_DIFF_MS = 2000;
 
-type Found = { uri: string; title: string; artists: string[]; durationMs: number };
+type Found = {
+  uri: string;
+  title: string;
+  artists: string[];
+  durationMs: number;
+  album?: string;
+  coverUrl?: string;
+};
+
+/** The catalogue track a local file or episode was matched to. */
+export type CatalogueMatch = {
+  id: string;
+  title: string;
+  artists: string[];
+  album: string;
+  durationMs: number;
+  coverUrl?: string;
+};
 
 /** Spotify's own search (the one behind the desktop search box), so no Web API token or rate limit. */
 async function searchTracks(term: string): Promise<Found[]> {
@@ -41,6 +58,11 @@ async function searchTracks(term: string): Promise<Found[]> {
         title: node.name,
         artists: (node.artists?.items ?? []).map((a: any) => a?.profile?.name).filter(Boolean),
         durationMs: 0,
+        album: node.albumOfTrack?.name,
+        // The largest cover on offer.
+        coverUrl: [...(node.albumOfTrack?.coverArt?.sources ?? [])].sort(
+          (a: any, b: any) => (b?.width ?? 0) - (a?.width ?? 0)
+        )[0]?.url,
       });
     }
     Object.values(node).forEach(walk);
@@ -65,7 +87,24 @@ export async function findSpotifyTrackId(
   isStale: () => boolean,
   titles: { titles: string[]; durationMs: number } = { titles: [], durationMs: 0 }
 ): Promise<string | null> {
+  return (await findSpotifyTrack(guesses, isStale, titles))?.id ?? null;
+}
+
+/** The catalogue entry a local file or episode matches, with its true title, artists and length. */
+export async function findSpotifyTrack(
+  guesses: TrackInfo[],
+  isStale: () => boolean,
+  titles: { titles: string[]; durationMs: number } = { titles: [], durationMs: 0 }
+): Promise<CatalogueMatch | null> {
   const tried = new Set<string>();
+  const entry = (m: Found, durationMs: number): CatalogueMatch => ({
+    id: m.uri.split(":")[2],
+    title: m.title,
+    artists: m.artists,
+    album: m.album ?? "",
+    durationMs,
+    coverUrl: m.coverUrl,
+  });
 
   for (const guess of guesses) {
     for (const term of [`${guess.artist} ${guess.name}`, guess.name]) {
@@ -85,7 +124,7 @@ export async function findSpotifyTrackId(
         try {
           const durationMs = await durationOf(match.uri);
           if (guess.durationMs > 0 && Math.abs(durationMs - guess.durationMs) > MAX_DURATION_DIFF_MS) continue;
-          return match.uri.split(":")[2];
+          return entry(match, durationMs);
         } catch (error) {
           logger.warn("Could not read the track's length", error);
         }
@@ -107,18 +146,19 @@ export async function findSpotifyTrackId(
       }
       const wanted = new Set(titleForms(title));
       const same = found.filter((f) => titleForms(f.title).some((form) => wanted.has(form))).slice(0, 6);
-      let best: { id: string; diff: number } | null = null;
+      let best: { match: CatalogueMatch; diff: number } | null = null;
       for (const match of same) {
         try {
-          const diff = Math.abs((await durationOf(match.uri)) - titles.durationMs);
+          const durationMs = await durationOf(match.uri);
+          const diff = Math.abs(durationMs - titles.durationMs);
           if (diff <= EXACT_LENGTH_DIFF_MS && (!best || diff < best.diff)) {
-            best = { id: match.uri.split(":")[2], diff };
+            best = { match: entry(match, durationMs), diff };
           }
         } catch (error) {
           logger.warn("Could not read the track's length", error);
         }
       }
-      if (best) return best.id;
+      if (best) return best.match;
     }
   }
   return null;

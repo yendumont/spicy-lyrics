@@ -204,6 +204,59 @@ All three are unofficial endpoints and sit just above Genius in the default prio
   YouTube client. *RMM Revival*: it has no public documentation (its domain redirects to a
   Roblox game page) and only relays Spicy Lyrics' own data, which this fork already asks.
 
+## Line meanings and translation
+
+Both add something under or beside each lyrics line once the lyrics are on screen
+(`utils/Lyrics/Extras/`), looked up in the background so the lyrics never wait for them.
+
+- **Line meanings** (Settings → Lyrics Display → Line Meanings / Meanings From): Genius's
+  annotations. A song's annotations come from the Worker's `/meanings` endpoint (trimmed,
+  and fetched in parallel, so it is fast); the **Worker must be redeployed** with the
+  current `workers/genius-proxy/worker.js` (an older one with only `/referents` still works,
+  more slowly; with neither nothing is shown and nothing is remembered, so it starts working
+  once updated). Meanings are looked up the moment a song starts, alongside the lyrics, not
+  after them. The Genius song is found with the same matching as the Genius lyrics provider,
+  so any song Genius lyrics can find also gets meanings, whichever provider supplied the
+  lyrics. Each annotation is placed on the lyrics line(s) that quote it (found as running
+  text across a few lines, by closeness when Genius spells a word its own way, so about nine
+  in ten place), and a small info button opens it; the card follows its line as the lyrics
+  scroll and stays until dismissed. Genius sorts annotations as *verified* (confirmed by the
+  artist), *accepted* (approved by its editors) or *unreviewed* (community); "Meanings From"
+  is Artist only / Artist and editors / Everyone. Kept 7 days.
+- **Translation** (Translate Lyrics, Gemini API Key, Translate Into, Gemini Model): each
+  line translated by Google's Gemini with **your own key** (Google AI Studio), shown under
+  the original. The lyrics of each song go to Google, once per song and language, and the
+  result is kept 60 days. The model defaults to `gemini-3.5-flash-lite`; change it in
+  settings if Google retires it. Lyrics are often explicit, so the request turns Gemini's
+  safety filters off for them; if Gemini still declines, a message says so. A rejected key
+  or model is not retried for a minute.
+
+## Animated covers (experiment)
+
+Settings → Experiments → **Animated Album Covers** (off by default). Apple Music's animated
+album art plays over the still cover in the Now Bar (the cover in Fullscreen and the larger
+view). The still cover stays underneath until the first frame is ready, and for albums with
+no animated cover, so nothing changes for them.
+
+- **Where it comes from:** the extension finds the album on Apple Music itself (iTunes search,
+  from your own connection: Apple turns that search away from the shared addresses a Worker
+  runs on, with a 403), then the Worker's `/motion?id=` reads the album page for its animated
+  cover's stream address. **Redeploy the Worker** for it; the Genius Proxy URL setting is
+  shared. Many albums have none (Apple only makes them for some), and those are remembered
+  for a week. When something does go wrong (Worker not updated, Apple unreachable) a message
+  says what, once.
+- **Why it is converted:** Spotify's own browser engine decodes only VP9 and AV1, not the
+  H.264 Apple serves (`MediaSource` and WebCodecs both report no support), so each cover is
+  converted once, on your PC, to a short silent looping WebM (`utils/AnimatedCover/`). That
+  uses ffmpeg compiled to WebAssembly, in its own worker, one core for a few seconds to a
+  minute per album. The result is kept in the browser cache (the 40 newest albums), so
+  every later play is instant and offline; a convert that fails is not remembered.
+- **The converter is downloaded, once:** ffmpeg (about 9 MB sent, 32 MB stored) comes from
+  the npm CDN (jsdelivr) at exact versions and is only used if each file's SHA-256 matches
+  the one in `FFmpegLoader.ts`; it is kept in the browser cache after that. To use other
+  versions, replace the URLs and hashes there together.
+- It pauses with the music and when Spotify is hidden. Turning the experiment off removes
+  the video straight away.
 ## Genius fallback (optional)
 
 Genius is a provider in the **Lyrics Provider Priority** list, last in the default order. With
@@ -280,21 +333,43 @@ Settings → Experiments → **Lyrics for Local Files & Podcasts** (off by defau
 local files (`spotify:local:`) and audio podcast episodes are looked up like songs, with
 every enabled provider asked in your priority order even with Provider Fallback off.
 
-The artist is guessed from the title (`providers/Unlisted.ts`): file tags first (split on
-`;` and `/`), then "Artist - Song", "Song - Artist", "Song by Artist", `Artist-Song`, runs
-of underscores read as " - ", and the names after `ft`/`prod` as artists, after stripping
-extensions, track numbers and credit tails. Up to six guesses are tried per provider; the
-first that matches (title, artist, duration) wins, so word- and line-synced providers are
-preferred just as for normal songs.
+The item is worked out **once, for every source** (`providers/Resolve.ts`, `ResolveTrack`):
 
-Spicy's own API needs a Spotify track id, so `providers/SpotifySearch.ts` first finds the
-catalogue track: it searches Spotify's own search (GraphQL `searchModalResults`, no Web API
-rate limit) and accepts a track whose title and artist match and whose length is within 10 s
-of the file's. With no artist to vouch for it, an exact title match within 2 s is accepted.
-If nothing fits, Spicy is skipped. Files with junk names (`B0CXMH1CMX`, `New_Project`),
-unreleased songs and differently cut versions still only get the other providers.
+1. The artist is guessed from the title (`providers/Unlisted.ts`): file tags first (split on
+   `;` and `/`), then "Artist - Song", "Song - Artist", "Song by Artist", `Artist-Song`, runs
+   of underscores read as " - ", and the names after `ft`/`prod` as artists, after stripping
+   extensions, track numbers and credit tails.
+2. Those guesses are matched against Spotify's catalogue (`providers/SpotifySearch.ts`, via
+   Spotify's own search, GraphQL `searchModalResults`, no Web API rate limit). A track is
+   accepted when its title and artist match and its length is within 10 s of the file's; with
+   no artist to vouch for it, an exact title match within 2 s.
+3. On a match, every provider (Spicy Lyrics' API included) is handed the **catalogue entry**:
+   its true title and artists, its length, album, cover and Spotify id. That is what lets
+   Spotify-id sources (AMLL TTML DB, Musixmatch), cover matching (Genius) and exact-title
+   sources work on a file named `03 - dua lipa - levitating.mp3`. Without a match, the guesses
+   are tried in turn, up to six, and Spicy Lyrics (which needs a catalogue id) is skipped.
 
-Plain podcast episodes with no song in the title find nothing. Video podcasts remain
+Files with junk names (`B0CXMH1CMX`, `New_Project`), unreleased songs and differently cut
+versions get no catalogue match, so only the guesses reach the providers.
+
+### Adding a provider
+
+Everything is built from `providers/registry.ts`, so a new provider works with the priority
+list, the Lyrics Sources panel, Check All Sources, pinning, the credit line, the
+word-sync-first search, the upgrade-after-first-result search and local files and podcasts
+without touching any of them:
+
+1. Write `providers/Foo.ts` exporting `fetchFromFoo(track: TrackInfo)`; it returns lyrics in
+   Spicy's shape (`Static` / `Line` / `Syllable`) with `source: "<creditKey>"`, or null.
+2. Add it to `PROVIDER_META` (label, credit key, best sync rank) and to `ORDER` in the registry.
+3. Add its fetcher to `fetchers` in `providers/index.ts`.
+
+The build fails until all three are done. The provider is handed a `TrackInfo` that is the
+song itself, or for a local file the catalogue entry it matched (see above), so it needs no
+special handling for either.
+
+Plain podcast episodes with no song in the title find nothing (they match nothing in the
+catalogue and give no artist to guess). Video podcasts remain
 unsupported. Takes effect from the next song. Cached under a key made from the whole uri.
 
 ## Rollback / uninstall

@@ -65,6 +65,13 @@ export const EXPERIMENTS = [
     pageClass: "Exp_LyricsSkeleton",
   },
   {
+    id: "animatedCover",
+    label: "Animated Album Covers",
+    description:
+      "Plays an album's animated cover from Apple Music (when it has one) over the still cover in Fullscreen and the larger view. Spotify cannot play Apple's video format, so each one is converted once on your PC, taking one CPU core for a few seconds to a minute, and the converter (about 9 MB, kept afterwards) is downloaded the first time. Needs your Worker updated for it. Disable to go back to the still cover.",
+    default: false,
+  },
+  {
     id: "unlistedLyrics",
     label: "Lyrics for Local Files & Podcasts",
     description:

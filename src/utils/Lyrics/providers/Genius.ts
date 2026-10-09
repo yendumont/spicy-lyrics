@@ -54,6 +54,7 @@ const matchOptions = (track: TrackInfo): MatchOptions => ({
 // Without one, the provider returns nothing.
 
 type GeniusResult = {
+  id?: number;
   title?: string;
   path?: string;
   lyrics_state?: string;
@@ -65,6 +66,8 @@ type GeniusResult = {
 };
 
 type Hit = {
+  /** Genius's own id for the song, which its annotations are filed under. */
+  id?: number;
   path: string;
   title: string;
   artists: string[];
@@ -79,6 +82,7 @@ type Hit = {
  * which artists this listener's library hosts (a guess from that very evidence does not).
  */
 export type Pick = {
+  id?: number;
   path: string;
   title: string;
   artist: string;
@@ -88,6 +92,7 @@ export type Pick = {
 };
 
 const toPick = (hit: Hit, how: string, flags: { learn?: boolean; trusted?: boolean } = {}): Pick => ({
+  id: hit.id,
   path: hit.path,
   title: hit.title,
   artist: hit.artists[0] ?? "",
@@ -176,6 +181,7 @@ async function searchSongs(base: string, query: string, perPage?: number): Promi
     .map((h) => h.result)
     .filter((r): r is GeniusResult => !!r?.path && r.lyrics_state === "complete")
     .map((r) => ({
+      id: r.id,
       path: r.path as string,
       title: r.title ?? "",
       artists: [
@@ -409,6 +415,26 @@ async function lyricsAt(base: string, path: string): Promise<any | null> {
   const text = extractLyrics(await res.text());
   const parsed = text ? parsePlainToStatic(text) : null;
   return parsed ? { ...parsed, source: "genius" } : null;
+}
+
+/**
+ * The Genius song a track is, without fetching lyrics or learning from the match: what
+ * the line meanings are looked up under. The exact song and artist first, then (with
+ * `loose`) the broader searches.
+ */
+export async function pickGeniusSong(
+  track: TrackInfo,
+  proxyUrl: string,
+  loose = false,
+  favorites: string[] = [],
+  eager = false
+): Promise<Pick | null> {
+  const base = normalizeProxyUrl(proxyUrl);
+  if (!base) return null;
+
+  const strict = await strictPicks(base, track);
+  if (strict[0]) return strict[0];
+  return loose ? ((await loosePicks(base, track, new Set(), favorites, eager))[0] ?? null) : null;
 }
 
 /**

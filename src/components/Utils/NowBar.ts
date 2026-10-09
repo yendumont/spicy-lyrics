@@ -5,6 +5,7 @@ import { QueueForceScroll, ResetLastLine } from "../../utils/Scrolling/ScrollToA
 import { $showVolumeSlider, $timelineOutsideMediaContent } from "../../utils/stores.ts";
 import { onExperimentChange } from "../../utils/experiments.ts";
 import { $isNowBarOpen, $nowBarSide } from "../../utils/uiState.ts";
+import { syncAnimatedCover } from "../../utils/AnimatedCover/index.ts";
 import Global from "../Global/Global.ts";
 import Session from "../Global/Session.ts";
 import { SpotifyPlayer } from "../Global/SpotifyPlayer.ts";
@@ -1448,6 +1449,9 @@ function UpdateNowBar(force = false) {
       });
   }
 
+
+  // The animated cover (an experiment) sits over the cover set above.
+  void syncAnimatedCover();
 
   MetadataContainer.classList.add("tr_VisuallyHidden");
   const metadataToken = ++metadataUpdateToken;

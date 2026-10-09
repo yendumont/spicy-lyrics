@@ -6,10 +6,14 @@
  * and Spicetify's built-in proxy refuses Genius. This Worker fetches Genius on the
  * extension's behalf and adds the CORS header.
  *
- * It is not an open proxy. It serves exactly four things, from genius.com and
- * music.youtube.com only:
+ * It is not an open proxy. It serves exactly seven things, from genius.com,
+ * music.youtube.com and Apple Music (itunes.apple.com, music.apple.com) only:
  *   GET /search?q=<text>        Genius song search (JSON); optional per_page (1-20), page (1-5)
  *   GET /lyrics?path=</x-lyrics>  a Genius lyrics page (HTML)
+ *   GET /motion?id=<n>          an album's Apple Music animated cover, by Apple album id: {square, tall} stream URLs (JSON)
+ *                               (older form, which searches too: /motion?artist=&album=)
+ *   GET /meanings?song_id=<n>   the annotations on a Genius song, trimmed to what is shown (JSON)
+ *   GET /referents?song_id=<n>  the same, as Genius sends them (JSON); optional page (1-5)
  *   GET /ytm/search?q=<text>    YouTube Music song search: {songs:[{videoId,title,artists,durationMs}]}
  *   GET /ytm/lyrics?videoId=<id>  a YouTube Music song's lyrics: {text, source}
  * and it only answers requests that come from Spotify's own page. It holds no
@@ -104,6 +108,132 @@ async function ytmLyrics(videoId) {
   return { text: text || null, source: footer || null };
 }
 
+// ── Line meanings ────────────────────────────────────────────────────────────
+// Genius's /referents answer is large (about half a megabyte a page, with every author of
+// every annotation), and a song takes up to three pages. This fetches the pages at once and
+// sends back only what the extension shows, a fraction of the size.
+const MEANING_PAGES = 3;
+
+function meaningLevel(referent) {
+  const annotation = referent.annotations?.[0];
+  if (referent.classification === "verified" || annotation?.verified) return "artist";
+  if (referent.classification === "accepted" || annotation?.state === "accepted") return "editor";
+  return "community";
+}
+
+async function geniusMeanings(songId) {
+  const page = async (n) => {
+    const res = await fetch(
+      `https://genius.com/api/referents?song_id=${songId}&text_format=plain&per_page=50&page=${n}`,
+      {
+        headers: { "User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9", Accept: "application/json" },
+        cf: { cacheEverything: true, cacheTtl: CACHE_SECONDS },
+      }
+    );
+    if (!res.ok) throw new Error(`genius responded ${res.status}`);
+    return (await res.json())?.response?.referents ?? [];
+  };
+
+  // Later pages of a song with few annotations are empty and cheap; only the first must succeed.
+  const pages = await Promise.all(
+    Array.from({ length: MEANING_PAGES }, (_, i) => page(i + 1).catch((error) => (i === 0 ? Promise.reject(error) : [])))
+  );
+
+  const meanings = [];
+  for (const referent of pages.flat()) {
+    if (referent.is_description || referent.is_image) continue;
+    const annotation = referent.annotations?.[0];
+    const text = annotation?.body?.plain?.trim();
+    const fragment = referent.fragment?.trim();
+    if (!text || !fragment) continue;
+    const level = meaningLevel(referent);
+    meanings.push({
+      fragment,
+      text,
+      level,
+      votes: annotation?.votes_total ?? 0,
+      author:
+        level === "artist"
+          ? (annotation?.verified_by?.name ?? annotation?.verified_by?.login)
+          : (annotation?.authors?.[0]?.user?.name ?? annotation?.authors?.[0]?.user?.login),
+      url: annotation?.url ?? referent.url,
+    });
+  }
+  return { meanings };
+}
+
+// ── Animated album covers (Apple Music) ──────────────────────────────────────
+// Apple's album pages carry each album's animated artwork as an HLS stream. The pages send
+// no CORS headers, so the Worker finds the album (iTunes search) and reads the stream's
+// address off the page.
+const APPLE_PAGE = /^https:\/\/music\.apple\.com\/[a-z]{2}\/album\/[\w\-.~%]+\/\d+$/;
+
+const plain = (value) =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, " ")
+    .replace(/\s-\s.*$/, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+
+/** The stream under `motionDetailSquare` / `motionDetailTall` in an album page. */
+function motionUrl(html, key) {
+  const at = html.indexOf(key);
+  if (at === -1) return null;
+  const found = html.slice(at, at + 4000).match(/video\\?":\\?"(https:[^"\\]+?\.m3u8)/);
+  return found ? found[1].replace(/\\\//g, "/") : null;
+}
+
+/**
+ * An album's animated cover by its Apple Music id. The extension finds the id itself (Apple
+ * rate-limits searches made from shared Worker addresses, but not from the listener's own),
+ * so the Worker only has to read the album page, whatever slug the address has.
+ */
+async function appleMotionById(id) {
+  const res = await fetch(`https://music.apple.com/us/album/x/${id}`, {
+    headers: { "User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9" },
+    cf: { cacheEverything: true, cacheTtl: CACHE_SECONDS },
+  });
+  if (!res.ok) throw new Error(`apple music responded ${res.status}`);
+  const html = await res.text();
+  const square = motionUrl(html, "motionDetailSquare");
+  return square ? { id: Number(id), square, tall: motionUrl(html, "motionDetailTall") } : {};
+}
+
+async function appleMotion(artist, album) {
+  const search = await fetch(
+    `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${album}`)}&entity=album&limit=8&country=us`,
+    { cf: { cacheEverything: true, cacheTtl: CACHE_SECONDS } }
+  );
+  if (!search.ok) throw new Error(`itunes responded ${search.status}`);
+  const wantArtist = plain(artist);
+  const wantAlbum = plain(album);
+
+  const matches = ((await search.json()).results ?? [])
+    .filter((r) => {
+      const a = plain(r.artistName);
+      const c = plain(r.collectionName);
+      return (
+        a && c && (a.includes(wantArtist) || wantArtist.includes(a)) && (c === wantAlbum || c.includes(wantAlbum) || wantAlbum.includes(c))
+      );
+    })
+    // The album named exactly as asked, then the rest.
+    .sort((x, y) => Number(plain(y.collectionName) === wantAlbum) - Number(plain(x.collectionName) === wantAlbum));
+
+  for (const result of matches.slice(0, 2)) {
+    const page = (result.collectionViewUrl ?? "").replace(/\?.*$/, "");
+    if (!APPLE_PAGE.test(page)) continue;
+    const res = await fetch(page, {
+      headers: { "User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9" },
+      cf: { cacheEverything: true, cacheTtl: CACHE_SECONDS },
+    });
+    if (!res.ok) continue;
+    const html = await res.text();
+    const square = motionUrl(html, "motionDetailSquare");
+    if (square) return { album: result.collectionName, id: result.collectionId, square, tall: motionUrl(html, "motionDetailTall") };
+  }
+  return {};
+}
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
@@ -150,6 +280,37 @@ export default {
       }
     }
 
+    if (url.pathname === "/motion") {
+      const id = url.searchParams.get("id") ?? "";
+      if (/^\d{5,12}$/.test(id)) {
+        try {
+          return reply(await appleMotionById(id), 200, { "Cache-Control": "public, max-age=3600" });
+        } catch (error) {
+          return reply({ error: String(error?.message ?? error) }, 502);
+        }
+      }
+      const artist = (url.searchParams.get("artist") ?? "").trim();
+      const album = (url.searchParams.get("album") ?? "").trim();
+      if (!artist || !album || artist.length > MAX_QUERY_LENGTH || album.length > MAX_QUERY_LENGTH) {
+        return reply({ error: "bad query" }, 400);
+      }
+      try {
+        return reply(await appleMotion(artist, album), 200, { "Cache-Control": "public, max-age=3600" });
+      } catch (error) {
+        return reply({ error: String(error?.message ?? error) }, 502);
+      }
+    }
+
+    if (url.pathname === "/meanings") {
+      const songId = url.searchParams.get("song_id") ?? "";
+      if (!/^\d{1,12}$/.test(songId)) return reply({ error: "bad song id" }, 400);
+      try {
+        return reply(await geniusMeanings(songId), 200, { "Cache-Control": "public, max-age=3600" });
+      } catch (error) {
+        return reply({ error: String(error?.message ?? error) }, 502);
+      }
+    }
+
     if (url.pathname === "/search") {
       const q = (url.searchParams.get("q") ?? "").trim();
       if (!q || q.length > MAX_QUERY_LENGTH) return reply({ error: "bad query" }, 400);
@@ -161,6 +322,12 @@ export default {
         perPage || page
           ? `https://genius.com/api/search/song?per_page=${perPage ?? 5}&page=${page ?? 1}&q=${encodeURIComponent(q)}`
           : `https://genius.com/api/search/multi?per_page=5&q=${encodeURIComponent(q)}`;
+    } else if (url.pathname === "/referents") {
+      // The annotations on a song's lyrics ("line meanings"), 50 to a page.
+      const songId = url.searchParams.get("song_id") ?? "";
+      if (!/^\d{1,12}$/.test(songId)) return reply({ error: "bad song id" }, 400);
+      const page = boundedInt(url.searchParams.get("page"), 1, MAX_PAGE) ?? 1;
+      target = `https://genius.com/api/referents?song_id=${songId}&text_format=plain&per_page=50&page=${page}`;
     } else if (url.pathname === "/lyrics") {
       const path = url.searchParams.get("path") ?? "";
       if (!LYRICS_PATH.test(path)) return reply({ error: "bad path" }, 400);
@@ -175,7 +342,7 @@ export default {
         headers: {
           "User-Agent": USER_AGENT,
           "Accept-Language": "en-US,en;q=0.9",
-          Accept: url.pathname === "/search" ? "application/json" : "text/html",
+          Accept: url.pathname === "/search" || url.pathname === "/referents" ? "application/json" : "text/html",
         },
         // Cloudflare-only: keep Genius's answer for a day so repeat plays do not hit it again.
         cf: { cacheEverything: true, cacheTtl: CACHE_SECONDS },

@@ -57,3 +57,6 @@ Read it once at build time and set `rebuildsNowBar: true` so the fullscreen over
 
 ## Testing changes in development
 Check if 127.0.0.1 port 8088 is running Spotify's chromium debugger. If it is, use that for testing changed features. You should do this automatically, don't ask for the user to do so unless they explicitly opted out in their message.
+
+## Fork handover
+Read [FORK_NOTES.md](FORK_NOTES.md) first: architecture map, Worker endpoints and platform quirks, test workflow, and the user's standing rules for this fork.

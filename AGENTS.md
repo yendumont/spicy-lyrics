@@ -54,3 +54,6 @@ Read it once at build time and set `rebuildsNowBar: true` so the fullscreen over
 **Rules:** `id` is permanent once shipped (it is the storage key). Both states must work — "off" restores the previous behaviour in full, not an approximation. `default: true` for a change you intend to become the norm; `false` for genuinely unfinished work.
 
 `src/utils/experiments.ts` has the full contract in its header comment. `newProgressBarStyling` (the glass progress/volume bars) is the reference implementation — a pure `pageClass` switch, with both skins living side by side in `ContentBox.css`.
+
+## Fork handover
+Read [FORK_NOTES.md](FORK_NOTES.md) first: architecture map, Worker endpoints and platform quirks, test workflow, and the user's standing rules for this fork.

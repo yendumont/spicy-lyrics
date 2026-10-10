@@ -41,6 +41,58 @@ function spans(group: ParsedVocalGroup): string {
   return out.join("");
 }
 
+export type ExportSync = "Syllable" | "Line" | "Static";
+const RANK: Record<ExportSync, number> = { Static: 0, Line: 1, Syllable: 2 };
+
+const lineText = (group: ParsedVocalGroup): string =>
+  group.Syllables.map((s, i) => s.Text.trim() + (!s.IsPartOfWord && i < group.Syllables.length - 1 ? " " : "")).join("").trim();
+
+/**
+ * `lyrics` with less sync: word timing becomes line timing (a background vocal its own line),
+ * and either becomes plain text. Sync cannot be invented, so asking for more than the lyrics
+ * have returns them as they are.
+ */
+export function reduceSync(lyrics: ParsedTTMLLyrics, to: ExportSync): ParsedTTMLLyrics {
+  if (RANK[to] >= RANK[lyrics.Type]) return lyrics;
+  const base = { SongWriters: lyrics.SongWriters };
+
+  let lines: { Text: string; Start?: number; End?: number; Opposite: boolean }[];
+  if (lyrics.Type === "Syllable") {
+    lines = lyrics.Content.flatMap((vocal) => [
+      { Text: lineText(vocal.Lead), Start: vocal.Lead.StartTime, End: vocal.Lead.EndTime, Opposite: vocal.OppositeAligned },
+      ...(vocal.Background ?? []).map((group) => ({
+        Text: lineText(group),
+        Start: group.StartTime,
+        End: group.EndTime,
+        Opposite: vocal.OppositeAligned,
+      })),
+    ]);
+  } else {
+    // Line -> Static
+    lines = (lyrics as Extract<ParsedTTMLLyrics, { Type: "Line" }>).Content.map((line) => ({
+      Text: line.Text ?? "",
+      Start: line.StartTime,
+      End: line.EndTime,
+      Opposite: line.OppositeAligned,
+    }));
+  }
+  lines = lines.filter((line) => line.Text);
+
+  if (to === "Static") return { ...base, Type: "Static", Lines: lines.map((line) => ({ Text: line.Text })) };
+  return {
+    ...base,
+    Type: "Line",
+    StartTime: lines[0]?.Start,
+    EndTime: lines[lines.length - 1]?.End,
+    Content: lines.map((line) => ({
+      Type: "Vocal" as const,
+      OppositeAligned: line.Opposite,
+      Text: line.Text,
+      StartTime: line.Start,
+      EndTime: line.End,
+    })),
+  };
+}
 export type TtmlInfo = { songwriters?: string[]; language?: string };
 
 /** TTML text for `lyrics`, or null when there is nothing to write. */

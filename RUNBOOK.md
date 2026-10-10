@@ -340,7 +340,7 @@ places at once). The cover then shows the song's normal album cover, or its anim
 Apple Music cover if it has one.
 ## Exporting lyrics as TTML
 
-Settings, Lyrics Sources, **Export Lyrics as TTML**. Saves the lyrics showing for the playing song as a`.ttml` file (named `Artist - Song.ttml`), whichever source they came from. Word timing, background vocals and the two singer sides are kept for word-synced lyrics; line-synced and unsynced lyrics export as such. Code: `utils/Lyrics/ttml/serialize.ts` (the reverse of `parser.ts`) and `utils/LyricsExport.ts`.
+Settings, Lyrics Sources. **Export Lyrics as TTML** saves the lyrics showing for the playing song as a `.ttml` file (`Artist - Song.ttml`); each source in the list also has its own **Export** button (once it shows Found, e.g. after Check All Sources) that saves that source's lyrics as `Artist - Song (Source).ttml`. The format picker next to the main button applies to both: **As they are**, **Word-synced**, **Line-synced** or **Unsynced**. Sync can be reduced (word to line, either to plain text) but not added, so asking for more than the lyrics have saves them as they are. Word-synced files keep background vocals and the two singer sides; unsynced files lose the singer sides. Code: `utils/Lyrics/ttml/serialize.ts` (the reverse of `parser.ts`, plus `reduceSync`) and `utils/LyricsExport.ts`.
 
 ## Genius fallback (optional)
 

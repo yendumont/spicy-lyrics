@@ -20,7 +20,7 @@ const keyOf = (language: string, lines: string[]): string => {
   const text = `${language.toLowerCase()}\n${lines.join("\n")}`;
   let h = 5381;
   for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
-  return `t-${(h >>> 0).toString(36)}-${lines.length}`;
+  return `t2-${(h >>> 0).toString(36)}-${lines.length}`;
 };
 
 const SAFETY_CATEGORIES = [
@@ -35,7 +35,7 @@ function promptFor(lines: string[], language: string): string {
   return [
     `You translate song lyrics into ${language}.`,
     `Translate each of the ${lines.length} numbered lines. Keep the meaning, tone and slang; do not censor or soften anything; do not merge or split lines.`,
-    `If a line is already in ${language}, or is only sounds (ooh, yeah, la la), return it unchanged.`,
+    `If a line is already in ${language} (even with slang, dialect or odd spelling), or is only sounds (ooh, yeah, la la), return an empty string "" for it. Never reword, correct or paraphrase a line that is already in ${language}.`,
     `Reply with a JSON array of exactly ${lines.length} strings, in the same order, with no numbering.`,
     "",
     numbered,
@@ -134,12 +134,30 @@ export function translateLyrics(lines: string[], language: string, apiKey: strin
   return promise;
 }
 
-/** Put each translation under its line. A line the translation leaves as it was gets none. */
+/** Whether two lines say the same thing, give or take punctuation, case and a stray word or two. */
+function sameLine(a: string, b: string): boolean {
+  const x = flatten(a);
+  const y = flatten(b);
+  if (x === y) return true;
+  if (!x || !y || Math.abs(x.length - y.length) > Math.max(x.length, y.length) * 0.2) return false;
+  // Levenshtein distance over a rolling row; lines are short.
+  let prev = Array.from({ length: y.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= x.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= y.length; j++) {
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[y.length] <= Math.max(x.length, y.length) * 0.15;
+}
+
+/** Put each translation under its line. A line the translation leaves (or nearly leaves) as it was gets none. */
 export function decorateTranslations(lines: AppliedLine[], translations: string[]): void {
   clearExtras("translation");
   lines.forEach((line, i) => {
     const text = translations[i]?.trim();
-    if (!text || flatten(text) === flatten(line.text)) return;
+    if (!text || sameLine(text, line.text)) return;
 
     const el = document.createElement("div");
     el.className = "LineTranslation";

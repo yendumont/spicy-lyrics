@@ -338,6 +338,10 @@ With **Live Video Background** on, its extra switch **Video Songs in the Backgro
 video itself in the blurred background instead of the cover (Spotify's video cannot be in two
 places at once). The cover then shows the song's normal album cover, or its animated Canvas or
 Apple Music cover if it has one.
+## Exporting lyrics as TTML
+
+Settings, Lyrics Sources, **Export Lyrics as TTML**. Saves the lyrics showing for the playing song as a`.ttml` file (named `Artist - Song.ttml`), whichever source they came from. Word timing, background vocals and the two singer sides are kept for word-synced lyrics; line-synced and unsynced lyrics export as such. Code: `utils/Lyrics/ttml/serialize.ts` (the reverse of `parser.ts`) and `utils/LyricsExport.ts`.
+
 ## Genius fallback (optional)
 
 Genius is a provider in the **Lyrics Provider Priority** list, last in the default order. With

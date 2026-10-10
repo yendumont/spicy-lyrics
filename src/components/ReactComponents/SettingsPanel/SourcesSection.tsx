@@ -1,6 +1,7 @@
 import { useStore } from "@nanostores/react";
 import React from "react";
 import { SpotifyPlayer } from "../../../components/Global/SpotifyPlayer.ts";
+import { ExportCurrentLyricsAsTTML } from "../../../utils/LyricsExport.ts";
 import { $lookupReport } from "../../../utils/Lyrics/providers/LookupReport.ts";
 import { PROVIDER_LABELS, resolveOrder } from "../../../utils/Lyrics/providers/ProviderOrder.ts";
 import { CheckAllSources } from "../../../utils/Lyrics/providers/Sources.ts";
@@ -22,6 +23,10 @@ const LABEL = "Sources for This Song";
 const DESCRIPTION =
   "Which lyrics sources have this song, and a way to pick one for it. Songs are normally looked up in your priority order and stop at the first good result; Check All Sources asks every source.";
 
+const EXPORT_LABEL = "Export Lyrics as TTML";
+const EXPORT_DESCRIPTION =
+  "Save the lyrics showing for the playing song as a .ttml file, whichever source they came from. Word timing, background vocals and the two singer sides are kept.";
+
 export default function SourcesSection({ query, sectionFilter }: { query: string; sectionFilter: string }) {
   const report = useStore($lookupReport);
   const picks = useStore($lyricsProviderPicks);
@@ -31,7 +36,11 @@ export default function SourcesSection({ query, sectionFilter }: { query: string
   const [checking, setChecking] = React.useState(false);
 
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
-  if (!matches(query, LABEL, DESCRIPTION) && !matches(query, "Chosen Source", "pin a lyrics source to a song")) {
+  if (
+    !matches(query, LABEL, DESCRIPTION) &&
+    !matches(query, "Chosen Source", "pin a lyrics source to a song") &&
+    !matches(query, EXPORT_LABEL, EXPORT_DESCRIPTION)
+  ) {
     return null;
   }
 
@@ -132,6 +141,14 @@ export default function SourcesSection({ query, sectionFilter }: { query: string
           Clear
         </button>
       </Row>
+
+      {matches(query, EXPORT_LABEL, EXPORT_DESCRIPTION) && (
+        <Row label={EXPORT_LABEL} description={EXPORT_DESCRIPTION}>
+          <button className="sl-sp-btn" disabled={!uri} onClick={ExportCurrentLyricsAsTTML}>
+            Export
+          </button>
+        </Row>
+      )}
     </>
   );
 }

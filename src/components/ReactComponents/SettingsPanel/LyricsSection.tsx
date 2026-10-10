@@ -185,6 +185,7 @@ export default function LyricsSection({ query, sectionFilter }: Props) {
           description="Needed for the Genius and YouTube Music lyrics providers: the address of your own Cloudflare Worker (see RUNBOOK.md; redeploy it after an update to get YouTube Music). Both give unsynced text only, and are tried last unless you pick them first. Without an address they find nothing."
         >
           <TextInput
+            secret
             value={geniusProxyUrl}
             placeholder="https://your-worker.workers.dev"
             onCommit={(v) => $geniusProxyUrl.set(v)}

@@ -32,6 +32,7 @@ The fork adds, on top of upstream:
   Cloudflare dashboard; you cannot deploy it. After a Worker change, tell them to redeploy, then test the live URL.
 - Build + install + restart Spotify: `powershell -ExecutionPolicy Bypass -File scripts\install-spicetify.ps1 -SkipInstall`
   (it runs `spicetify apply`, which restarts Spotify). Lint: `bun run lint`. Types: `bun x tsc --noEmit`.
+- macOS/Linux: `scripts/install-spicetify.sh` and `scripts/update-fork.sh` mirror the PowerShell scripts (see RUNBOOK.md, `macOS and Linux`). They were written without access to a Mac or bash and are **untested**; keep them in sync with the `.ps1` versions when either changes. `.gitattributes` forces LF for `*.sh`.
 - Remotes: `origin` = user's fork, `upstream` = Spikerko. `scripts\update-fork.ps1` merges upstream.
 - **Rules from the user:** commit only when told. **Do not push** (no credentials here). Commit trailer:
   `Co-Authored-By: Claude ... <noreply@anthropic.com>`. No secrets in the repo. Never use or store tokens the user

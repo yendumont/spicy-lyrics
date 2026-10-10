@@ -84,6 +84,43 @@ For fast iteration, `bun run dev` instead. Stop it before running the install sc
 the script refuses to run while a dev watcher is active, and dev mode registers its own
 live-reload helper. The install script removes that helper from your config.
 
+## macOS and Linux
+
+Everything except the two PowerShell scripts is platform-neutral, and each script has a
+bash twin with the same behaviour. They were written from the PowerShell versions and have
+**not been run on a Mac yet**; if one misbehaves, the manual steps below are the fallback.
+
+Prerequisites: [Spicetify](https://spicetify.app) applied to Spotify at least once
+(`spicetify backup apply`), [Bun](https://bun.sh) (`curl -fsSL https://bun.sh/install | bash`)
+and git (macOS: `xcode-select --install`). Run from the repo root, in Terminal:
+
+```bash
+scripts/install-spicetify.sh                 # install, or rebuild after editing code
+scripts/install-spicetify.sh --skip-install  # same, without `bun install`
+scripts/install-spicetify.sh --no-apply      # do not restart Spotify
+scripts/install-spicetify.sh --uninstall     # remove it again
+scripts/update-fork.sh                       # merge upstream, then rebuild and reinstall
+```
+
+Flags: `update-fork.sh` takes `--branch <name>`, `--force`, `--no-install`, `--no-apply`.
+If a script is not executable, run `chmod +x scripts/*.sh` once (or prefix with `bash`).
+Everything else in this runbook (provider priority, Worker, merge conflicts) applies
+unchanged; read `-Flag` as `--flag`.
+
+By hand, if you prefer:
+
+```bash
+bun install && bun run build            # writes spicy-lyrics.js into Spicetify's Extensions folder
+EXT="$(spicetify path userdata)/Extensions"
+mv "$EXT/spicy-lyrics.js" "$EXT/spicy-lyrics-providers.js"
+spicetify config extensions spicy-lyrics-providers.js
+spicetify config extensions spicy-lyrics.js-       # drop the plain build, if registered
+spicetify apply
+```
+
+Testing against the real client: quit Spotify, start it with
+`open -a Spotify --args --remote-debugging-port=8088`, then
+`bun scripts/dev/cdp.ts <file.js>` (see `FORK_NOTES.md`).
 ## Verify
 
 1. `spicetify config extensions` lists `spicy-lyrics-providers.js` and not

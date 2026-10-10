@@ -18,6 +18,7 @@ The fork adds, on top of upstream:
 - Show-first-then-upgrade search (the first lyrics found are shown at once, better-synced ones replace them).
 - A **Lyrics Sources** settings panel: per-provider status, "Check All Sources", per-song pin, "Clear Chosen Source".
 - Experiment **Lyrics for Local Files & Podcasts** (`unlistedLyrics`).
+- Experiment **Word-Synced Translation** (`syncedTranslation`): on word-synced songs the translation is chunked by Gemini against the numbered sung words and lit word by word (`Extras/TranslationSyncDriver.ts`, driven from `Animate()`). Verified on Blinding Lights to Spanish; the same Translation.ts cache holds it (JSON chunk strings, key prefixed with a `§`-tagged word list).
 - **Line meanings** from Genius annotations (setting `lineMeaningsFrom`: artist / artist+editors / everyone).
 - **Gemini translation** with the user's own key (`geminiApiKey`, `translateLyrics`, `translationLanguage`).
 - Experiment **Animated Album Covers** (`animatedCover`): Apple Music motion art -> WebM via ffmpeg.wasm.
@@ -56,7 +57,7 @@ The fork adds, on top of upstream:
 | Priority list logic | `providers/ProviderOrder.ts` |
 | Orchestration around Spicy's API | `utils/Lyrics/fetchLyrics.ts` |
 | Genius id aliases | `providers/GeniusAliases.ts` |
-| Per-line extras (meanings, translation) | `utils/Lyrics/Extras/` (`index.ts`, `LineElements.ts`, `Meanings*.ts`, `MeaningsUI.ts`, `Translation.ts`) |
+| Per-line extras (meanings, translation) | `utils/Lyrics/Extras/` (`index.ts`, `LineElements.ts`, `Meanings*.ts`, `MeaningsUI.ts`, `Translation.ts`, `SyncedWords.ts`, `TranslationSyncDriver.ts`) |
 | Animated covers | `utils/AnimatedCover/` (`AnimatedCover.ts`, `FFmpegLoader.ts`, `Transcode.ts`) |
 | Experiments registry | `utils/experiments.ts` |
 | Settings store / UI | `utils/stores.ts`, `components/ReactComponents/SettingsPanel/LyricsSection.tsx` |

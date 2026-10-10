@@ -2,6 +2,8 @@ import { isDev } from "../../../components/Global/Defaults.ts";
 import { GetExpireStore } from "../../../modules/Store.ts";
 import Logger from "../../Logger.ts";
 import { addExtra, clearExtras, flatten, type AppliedLine } from "./LineElements.ts";
+import type { SyncWord } from "./SyncedWords.ts";
+import { setSyncedTranslations } from "./TranslationSyncDriver.ts";
 
 const logger = new Logger("Translation");
 
@@ -42,18 +44,19 @@ function promptFor(lines: string[], language: string): string {
   ].join("\n");
 }
 
-async function translateChunk(lines: string[], language: string, apiKey: string, model: string): Promise<string[]> {
+/** One request to Gemini; the answer as parsed JSON. */
+async function askGemini(prompt: string, schema: object, apiKey: string, model: string): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: promptFor(lines, language) }] }],
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
           responseMimeType: "application/json",
-          responseSchema: { type: "ARRAY", items: { type: "STRING" } },
+          responseSchema: schema,
         },
         // Lyrics are often explicit; refusing to translate them helps nobody.
         safetySettings: SAFETY_CATEGORIES.map((category) => ({ category, threshold: "BLOCK_NONE" })),
@@ -89,10 +92,60 @@ async function translateChunk(lines: string[], language: string, apiKey: string,
   } catch {
     throw new TranslationError("Gemini's answer could not be read");
   }
+  return parsed;
+}
+
+async function translateChunk(lines: string[], language: string, apiKey: string, model: string): Promise<string[]> {
+  const parsed = await askGemini(promptFor(lines, language), { type: "ARRAY", items: { type: "STRING" } }, apiKey, model);
   if (!Array.isArray(parsed) || parsed.length !== lines.length || parsed.some((t) => typeof t !== "string")) {
     throw new TranslationError("Gemini's answer did not match the lyrics line for line");
   }
   return parsed as string[];
+}
+
+/** A piece of a translated line and the number (from 1) of the sung word it lines up with. */
+export type TranslationChunk = { t: string; w: number };
+
+function syncedPromptFor(lines: string[][], language: string): string {
+  const numbered = lines
+    .map((words, i) => `${i + 1}. ${words.map((word, n) => `${n + 1}:${word}`).join(" ")}`)
+    .join("\n");
+  return [
+    `You translate song lyrics into ${language}, lined up with the words as they are sung.`,
+    `Each of the ${lines.length} numbered lines is given as its sung words, each tagged "number:word". Translate each line, keeping the meaning, tone and slang; do not censor or soften anything; do not merge or split lines.`,
+    `Give each line's translation as consecutive chunks in reading order (a word or short phrase each). For every chunk, "w" is the number of the sung word it matches best. Within a line "w" never decreases; if the word order differs, pick the nearest sung word that keeps it that way. The chunks joined exactly make the translated line, so keep the spaces inside the chunks (at the end of each chunk but the last).`,
+    `If a line is already in ${language} (even with slang, dialect or odd spelling), or is only sounds (ooh, yeah, la la), return an empty array [] for it. Never reword, correct or paraphrase a line that is already in ${language}.`,
+    `Reply with a JSON array of exactly ${lines.length} arrays of {"t": chunk, "w": number}, in the same order.`,
+    "",
+    numbered,
+  ].join("\n");
+}
+
+const SYNCED_SCHEMA = {
+  type: "ARRAY",
+  items: {
+    type: "ARRAY",
+    items: { type: "OBJECT", properties: { t: { type: "STRING" }, w: { type: "INTEGER" } }, required: ["t", "w"] },
+  },
+};
+
+async function translateSyncedChunk(lines: string[][], language: string, apiKey: string, model: string): Promise<string[]> {
+  const parsed = await askGemini(syncedPromptFor(lines, language), SYNCED_SCHEMA, apiKey, model);
+  if (!Array.isArray(parsed) || parsed.length !== lines.length || parsed.some((line) => !Array.isArray(line))) {
+    throw new TranslationError("Gemini's answer did not match the lyrics line for line");
+  }
+  // One JSON string per line, so synced and plain translations share the cache.
+  return (parsed as any[][]).map((chunks, i) => {
+    let last = 1;
+    const clean: TranslationChunk[] = [];
+    for (const chunk of chunks) {
+      if (typeof chunk?.t !== "string" || chunk.t === "") continue;
+      const w = Math.min(lines[i].length, Math.max(last, Math.round(Number(chunk.w)) || last));
+      clean.push({ t: chunk.t, w });
+      last = w;
+    }
+    return JSON.stringify(clean);
+  });
 }
 
 const inFlight = new Map<string, Promise<string[]>>();
@@ -102,7 +155,39 @@ const RETRY_AFTER_MS = 60_000;
 
 /** `lines` translated into `language`, one string per line, kept for 60 days. */
 export function translateLyrics(lines: string[], language: string, apiKey: string, model: string): Promise<string[]> {
-  const key = keyOf(language, lines);
+  return translateAny(lines, false, language, apiKey, model);
+}
+
+/**
+ * Like `translateLyrics`, but each line is given as its sung words and comes back as JSON
+ * chunks (`TranslationChunk[]`) tied to those words, for translations that follow the singing.
+ */
+export function translateLyricsSynced(
+  lines: string[][],
+  language: string,
+  apiKey: string,
+  model: string
+): Promise<TranslationChunk[][]> {
+  return translateAny(lines, true, language, apiKey, model).then((rows) =>
+    rows.map((row) => {
+      try {
+        const chunks = JSON.parse(row);
+        return Array.isArray(chunks) ? (chunks as TranslationChunk[]) : [];
+      } catch {
+        return [];
+      }
+    })
+  );
+}
+
+function translateAny(
+  lines: (string | string[])[],
+  synced: boolean,
+  language: string,
+  apiKey: string,
+  model: string
+): Promise<string[]> {
+  const key = keyOf(language, synced ? lines.map((words) => `§${(words as string[]).join("\u0001")}`) : (lines as string[]));
   const attempt = `${apiKey}|${model}`;
   const failed = failedAt.get(attempt);
   if (failed && Date.now() - failed.at < RETRY_AFTER_MS) return Promise.reject(failed.error);
@@ -115,7 +200,12 @@ export function translateLyrics(lines: string[], language: string, apiKey: strin
 
       const out: string[] = [];
       for (let i = 0; i < lines.length; i += CHUNK) {
-        out.push(...(await translateChunk(lines.slice(i, i + CHUNK), language, apiKey, model)));
+        const part = lines.slice(i, i + CHUNK);
+        out.push(
+          ...(synced
+            ? await translateSyncedChunk(part as string[][], language, apiKey, model)
+            : await translateChunk(part as string[], language, apiKey, model))
+        );
       }
       await store.SetItem(key, out).catch(() => undefined);
       return out;
@@ -154,6 +244,7 @@ function sameLine(a: string, b: string): boolean {
 
 /** Put each translation under its line. A line the translation leaves (or nearly leaves) as it was gets none. */
 export function decorateTranslations(lines: AppliedLine[], translations: string[]): void {
+  setSyncedTranslations([]);
   clearExtras("translation");
   lines.forEach((line, i) => {
     const text = translations[i]?.trim();
@@ -166,6 +257,53 @@ export function decorateTranslations(lines: AppliedLine[], translations: string[
   });
 }
 
+/**
+ * Translations under word-synced lines, each in chunks that light up as the sung word they
+ * match is sung. A line whose chunks are missing, or only repeat the line, gets none.
+ */
+export function decorateSyncedTranslations(lines: AppliedLine[], words: SyncWord[][], chunks: TranslationChunk[][]): void {
+  clearExtras("translation");
+  const driven: Parameters<typeof setSyncedTranslations>[0] = [];
+
+  lines.forEach((line, i) => {
+    const parts = chunks[i];
+    const sung = words[i];
+    if (!parts?.length || !sung?.length) return;
+    if (sameLine(parts.map((p) => p.t).join(""), line.text)) return;
+
+    // A chunk lasts from its word to the next chunk's word (or the end of the line); chunks
+    // that share a word split its time between them.
+    const lineEnd = sung[sung.length - 1].end;
+    const startOf = (part: TranslationChunk) => sung[Math.min(sung.length, Math.max(1, part.w)) - 1].start;
+    const el = document.createElement("div");
+    el.className = "LineTranslation Synced";
+    const timed: { el: HTMLElement; start: number; end: number }[] = [];
+
+    let k = 0;
+    while (k < parts.length) {
+      let m = k;
+      while (m + 1 < parts.length && parts[m + 1].w === parts[k].w) m++;
+      const from = startOf(parts[k]);
+      const to = m + 1 < parts.length ? startOf(parts[m + 1]) : lineEnd;
+      const each = (to - from) / (m - k + 1);
+      for (let n = k; n <= m; n++) {
+        const span = document.createElement("span");
+        span.className = "TrWord";
+        span.textContent = parts[n].t;
+        el.appendChild(span);
+        timed.push({ el: span, start: from + each * (n - k), end: from + each * (n - k + 1) });
+      }
+      k = m + 1;
+    }
+
+    addExtra("translation", line.el, el);
+    driven.push({ start: sung[0].start, end: lineEnd, chunks: timed });
+  });
+
+  setSyncedTranslations(driven);
+}
+
 export function removeTranslations(): void {
+  setSyncedTranslations([]);
   clearExtras("translation");
 }

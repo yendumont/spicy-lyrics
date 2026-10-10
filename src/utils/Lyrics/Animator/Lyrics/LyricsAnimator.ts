@@ -1,5 +1,6 @@
 // @ts-ignore pkg has no @types on npm
 import Spline from "cubic-spline";
+import { driveSyncedTranslations } from "../../Extras/TranslationSyncDriver.ts";
 import { easeSinOut } from "d3-ease";
 import { $currentLyricsType, $simpleLyricsMode, $simpleLyricsModeRenderingType } from "../../../../utils/stores.ts";
 import { LyricsObject, SimpleLyricsMode_LetterEffectsStrengthConfig, preHiddenDotLineMs } from "../../lyrics.ts";
@@ -551,6 +552,8 @@ export function Animate(position: number): void {
   const CurrentLyricsType = $currentLyricsType.get();
 
   if (!CurrentLyricsType || CurrentLyricsType === "None") return;
+
+  driveSyncedTranslations(ProcessedPosition);
 
   // Define proper types for the arrays and indices
   const applyBlur = (

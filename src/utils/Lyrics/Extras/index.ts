@@ -10,11 +10,20 @@ import {
   $translateLyrics,
   $translationLanguage,
 } from "../../stores.ts";
+import { $experiment, isExperimentEnabled } from "../../experiments.ts";
 import { normalizeProxyUrl } from "../providers/Genius.ts";
 import { appliedLines, appliedType } from "./LineElements.ts";
 import { alignMeanings, asMeaningsFrom, filterMeanings, getMeanings } from "./Meanings.ts";
 import { closeMeaningCard, decorateMeanings, removeMeanings } from "./MeaningsUI.ts";
-import { TranslationError, decorateTranslations, removeTranslations, translateLyrics } from "./Translation.ts";
+import { syncWords, type SyncWord } from "./SyncedWords.ts";
+import {
+  TranslationError,
+  decorateSyncedTranslations,
+  decorateTranslations,
+  removeTranslations,
+  translateLyrics,
+  translateLyricsSynced,
+} from "./Translation.ts";
 
 /**
  * Things added to each lyrics line once the lyrics are on screen: what the line means
@@ -54,23 +63,38 @@ async function refresh(): Promise<void> {
   const key = $geminiApiKey.get().trim();
   if ($translateLyrics.get() && key) {
     const language = $translationLanguage.get().trim() || "English";
-    translateLyrics(
-      lines.map((l) => l.text),
-      language,
-      key,
-      $geminiModel.get().trim() || "gemini-3.5-flash-lite"
-    ).then(
-      (translations) => {
+    const model = $geminiModel.get().trim() || "gemini-3.5-flash-lite";
+    const failed = (error: unknown) => {
+      if (!current()) return;
+      const message = error instanceof TranslationError ? error.message : "Translation failed";
+      // One notice per problem, not one per song.
+      if (message !== lastTranslationError) toast.error(message);
+      lastTranslationError = message;
+    };
+
+    // Word-synced lyrics (when the experiment is on) get a translation that follows the singing.
+    const words = type === "Syllable" && isExperimentEnabled("syncedTranslation")
+      ? lines.map((l) => syncWords(l.el))
+      : null;
+    if (words && words.every((w): w is SyncWord[] => w !== null)) {
+      translateLyricsSynced(
+        words.map((line) => line.map((w) => w.text.trim())),
+        language,
+        key,
+        model
+      ).then((chunks) => {
+        if (current()) decorateSyncedTranslations(lines, words as SyncWord[][], chunks);
+      }, failed);
+    } else {
+      translateLyrics(
+        lines.map((l) => l.text),
+        language,
+        key,
+        model
+      ).then((translations) => {
         if (current()) decorateTranslations(lines, translations);
-      },
-      (error) => {
-        if (!current()) return;
-        const message = error instanceof TranslationError ? error.message : "Translation failed";
-        // One notice per problem, not one per song.
-        if (message !== lastTranslationError) toast.error(message);
-        lastTranslationError = message;
-      }
-    );
+      }, failed);
+    }
   } else {
     removeTranslations();
   }
@@ -112,6 +136,7 @@ export function initLineExtras(): void {
     $translationLanguage,
     $geminiModel,
     $geniusProxyUrl,
+    $experiment("syncedTranslation"),
   ]) {
     store.listen(() => {
       lastTranslationError = "";

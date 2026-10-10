@@ -268,6 +268,10 @@ Both add something under or beside each lyrics line once the lyrics are on scree
   safety filters off for them; if Gemini still declines, a message says so. A rejected key
   or model is not retried for a minute.
 
+### Word-synced translation (experiment)
+
+Settings, Experiments, **Word-Synced Translation** (off by default). On songs with word-synced lyrics, the translation under each line lights up chunk by chunk as the matching sung word is sung, instead of sitting still. Gemini is sent each line as its numbered sung words and returns the translation in chunks, each tagged with the sung word it lines up with; each chunk is lit from that word's start to the next chunk's word (chunks sharing a word split its time). It is a separate translation request per song (cached like the plain one, under its own key), so turning it on re-translates songs once. Line-synced and unsynced songs, and any line it cannot line up, keep the plain translation. Code: `utils/Lyrics/Extras/` (`SyncedWords.ts` reads word timing from the shown lyrics, `Translation.ts` asks Gemini and builds the chunks, `TranslationSyncDriver.ts` moves the lit part each frame, called from `LyricsAnimator.ts`); CSS in `css/Lyrics/Extras.css`.
+
 ## Animated covers (experiment)
 
 Settings → Experiments → **Animated Album Covers** (off by default). Apple Music's animated

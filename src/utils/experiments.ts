@@ -102,6 +102,13 @@ export const EXPERIMENTS = [
     default: true,
   },
   {
+    id: "syncedTranslation",
+    label: "Word-Synced Translation",
+    description:
+      "On songs with word-synced lyrics, the translation lights up word by word in time with the singing instead of sitting still under each line. Gemini is asked to line its translation up with the sung words, so each song is translated again once (one more request). Needs Translate Lyrics on. Other songs, and lines it cannot line up, keep the plain translation. Disable to bring back the plain translation.",
+    default: false,
+  },
+  {
     id: "keepVideoAspect",
     label: "Keep Video Aspect Ratio",
     description:

@@ -127,7 +127,7 @@ Hard-won facts:
   (also `canvas.type` VIDEO_*, `canvas.id`). It is H.264 MP4 on canvaz.scdn.co, fetchable with plain `fetch` (CORS ok), not playable
   (error code 4) so `Transcode.ts:transcodeCanvas` converts it (`scale=540:-2`, keeps 9:16; duration read from the MP4 `mvhd` box, pieces of >=2 s).
   Metadata appears a moment after a song change, so `findCanvas` polls up to 1.5 s.
-- `Motion.ts`: `getMotion({apple, canvas})` returns the Canvas first, else Apple's cover; `loopVideo`/`dropVideo`/`pauseOrResumeAll` are shared by both displays.
+- `Motion.ts`: `getMotion({apple, canvas}, isCurrent, prefer)` returns the preferred source first: the cover passes `"apple"` (Apple's square cover stays on the cover) and the live background the default `"canvas"`, so a song with both shows both; a song with one shows it in both places; `loopVideo`/`dropVideo`/`pauseOrResumeAll` are shared by both displays.
   `AnimatedCover.ts:memoVideo(key, produce)` is the shared memory+Cache Storage layer (`/video/<key>`, max 40, keys `canvas-<id>` or the Apple hash).
 - `index.ts` = the cover (needs `animatedCover` and/or `spotifyCanvas`); `LiveBackground.ts` = a `<video class="LiveBackgroundVideo">` appended to `.ContentBox`
   at z-index 1 (above the `.spicy-dynamic-bg` canvas, below lyrics z 4), CSS in `css/Lyrics/Extras.css`, blur via `--LiveBackgroundBlur` (set on the page and root, like the static background blur).

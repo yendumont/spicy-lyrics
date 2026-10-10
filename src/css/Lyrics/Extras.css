@@ -235,3 +235,15 @@
 #SpicyLyricsPage .MediaImageContainer.HasPlayerVideo > video {
   border-radius: inherit;
 }
+
+/* ── Keep Video Aspect Ratio (experiment) ───────────────────────────────────── */
+/* Videos sit whole in their box instead of being cropped to fill it. */
+#SpicyLyricsPage.Exp_KeepVideoAspect .MediaImageContainer .AnimatedCoverVideo {
+  object-fit: contain;
+}
+
+#SpicyLyricsPage.Exp_KeepVideoAspect .LiveBackgroundVideo {
+  object-fit: contain;
+  /* Nothing needs hiding at the edges now: the picture is not stretched to them. */
+  scale: 1;
+}

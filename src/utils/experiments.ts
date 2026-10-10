@@ -91,7 +91,7 @@ export const EXPERIMENTS = [
     id: "spotifyCanvas",
     label: "Spotify Canvas as Animated Cover",
     description:
-      "Plays a song's Spotify Canvas (the short looping video artists add to their songs) over the still cover in Fullscreen and the larger view. A song's Canvas takes the place of Apple's album cover when it has one; songs without a Canvas still use Apple's if that experiment is on. Canvases are tall, so they are cropped to the cover's shape. Like Apple's, each Canvas is converted once on your PC (a few seconds) for Spotify to play it. Disable to stop using Canvas.",
+      "Plays a song's Spotify Canvas (the short looping video artists add to their songs) over the still cover in Fullscreen and the larger view. Where a song has both, Apple's album cover stays on the cover and the Canvas goes to the Live Video Background; a song with only a Canvas shows it on the cover. Canvases are tall, so they are cropped to the cover's shape. Like Apple's, each Canvas is converted once on your PC (a few seconds) for Spotify to play it. Disable to stop using Canvas.",
     default: false,
   },
   {
@@ -100,7 +100,16 @@ export const EXPERIMENTS = [
     description:
       "Lets songs that Spotify plays as a music video get lyrics from every provider, and shows the video itself in Fullscreen and the larger view in place of the still picture. Spotify draws its video in the Now Playing sidebar, so that sidebar must be open and set to video (its Switch to video button) for the video to appear in the cover; the thumbnail shows otherwise. Takes effect from the next song. Disable to bring back the notice that video songs have no lyrics, and the thumbnail.",
     default: true,
-  },  {
+  },
+  {
+    id: "keepVideoAspect",
+    label: "Keep Video Aspect Ratio",
+    description:
+      "Shows the animated covers, Canvases and the live video background in their own shape instead of cropping them to fill: a tall Canvas sits whole in the cover (with the still cover showing at its sides) and a background video is not zoomed to fill the window (the normal background shows around it). Disable to crop them to fill.",
+    default: false,
+    pageClass: "Exp_KeepVideoAspect",
+  },
+  {
     id: "liveBackground",
     label: "Live Video Background",
     description:

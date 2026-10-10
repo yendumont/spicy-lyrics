@@ -304,14 +304,18 @@ Settings, Experiments (both off by default):
   (the playing track's `canvas.url`), and the file can be fetched directly, so **no Worker
   change is needed**. It is H.264 too, so it is converted once like Apple's (a few seconds,
   split over several cores), kept in the same cache, and then instant. A Canvas is tall
-  (9:16): it keeps its shape and the cover box crops it to a square. A song's Canvas takes
-  the place of Apple's cover when it has one; songs without use Apple's if that experiment
-  is on. Most popular songs have a Canvas, far more than have an Apple cover.
+  (9:16): it keeps its shape and the cover box crops it to a square. Where a song has both,
+  Apple's cover stays on the cover and the Canvas goes to the live background; a song with only
+  a Canvas shows it on the cover. Most popular songs have a Canvas, far more than have an Apple cover.
 - **Live Video Background.** The same video fills the background of Fullscreen and the
   larger view, darkened and blurred behind the lyrics; the normal animated background stays
   underneath and shows for songs with no video. It tries both sources by itself, so it works
   without the two cover experiments being on. **Background Blur** (0 to 60 px, default 24)
   appears under it while it is on, and changes straight away.
+- **Keep Video Aspect Ratio** (a separate experiment, off by default) shows these videos whole
+  instead of cropping them to fill: a tall Canvas sits entire in the cover (the still cover shows
+  at its sides) and the background video is not zoomed to the window (the normal background
+  shows around it).
 ### Video songs (experiment, on by default)
 
 Settings, Experiments, **Video Songs**. Songs Spotify plays as a music video used to show

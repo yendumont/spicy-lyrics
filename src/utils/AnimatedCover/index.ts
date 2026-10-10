@@ -8,8 +8,8 @@ import { dropVideo, getMotion, loopVideo, pauseOrResumeAll } from "./Motion.ts";
 import { initLiveBackground } from "./LiveBackground.ts";
 
 /**
- * Plays the song's animated cover (its Spotify Canvas, or its album's animated cover from
- * Apple Music) over the still cover in the Now Bar (the cover in Fullscreen and in the larger
+ * Plays the song's animated cover (its album's animated cover from Apple Music, or else its
+ * Spotify Canvas) over the still cover in the Now Bar (the cover in Fullscreen and in the larger
  * view). The still cover stays underneath, so nothing changes while the video is made or if
  * the song has none. A Canvas is tall, so the box crops it to the cover's shape.
  */
@@ -43,7 +43,8 @@ export async function syncAnimatedCover(): Promise<void> {
   detach();
 
   // The song may change, or the cover be closed, while the video is being made.
-  const motion = await getMotion(use, () => mine === generation);
+  // The cover prefers Apple's album cover and leaves the Canvas to the background (see Motion.ts).
+  const motion = await getMotion(use, () => mine === generation, "apple");
   if (mine !== generation || !motion) return;
   const live = PageContainer?.querySelector<HTMLElement>(CONTAINER);
   if (!live?.isConnected) return;

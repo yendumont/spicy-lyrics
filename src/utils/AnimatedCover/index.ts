@@ -46,7 +46,7 @@ export async function syncAnimatedCover(): Promise<void> {
   if (attached?.key === key && attached.video.isConnected && container.contains(attached.video)) return;
   detach();
 
-  const url = await getAnimatedCover(reading.artist, reading.album);
+  const url = await getAnimatedCover(reading.artist, reading.album, reading.name);
   // The song may have changed, or the cover been closed, while the video was being made.
   if (mine !== generation || !url) return;
   const live = PageContainer?.querySelector<HTMLElement>(CONTAINER);

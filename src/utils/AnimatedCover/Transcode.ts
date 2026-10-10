@@ -11,6 +11,11 @@ const MAX_SECONDS = 30;
 const MAX_BYTES = 16 * 1024 * 1024;
 const MAX_SEGMENTS = 60;
 const TIMEOUT_MS = 180_000;
+// A cover is converted in this many pieces at once, each in its own ffmpeg, then joined: the
+// conversion is one core's work, so this is close to that many times faster. A piece is never
+// shorter than MIN_PIECE_SECONDS, and some cores are left for Spotify itself.
+const MAX_PIECES = 4;
+const MIN_PIECE_SECONDS = 4;
 
 type Variant = { uri: string; width: number; bandwidth: number };
 
@@ -53,7 +58,7 @@ async function getText(url: string): Promise<string> {
  * pieces the playlist names by byte range, and that one file, whole, is the video; otherwise
  * each piece is its own file and they are joined in order.
  */
-async function downloadStream(playlistUrl: string): Promise<Uint8Array> {
+async function downloadStream(playlistUrl: string): Promise<{ bytes: Uint8Array; seconds: number }> {
   const playlist = await getText(playlistUrl);
   const lines = playlist.split(/\r?\n/).map((line) => line.trim());
 
@@ -86,7 +91,9 @@ async function downloadStream(playlistUrl: string): Promise<Uint8Array> {
     joined.set(part, at);
     at += part.length;
   }
-  return joined;
+  // The playlist lists how long each piece plays; their sum is how long the cover is.
+  const seconds = [...playlist.matchAll(/#EXTINF:([\d.]+)/g)].reduce((total, m) => total + Number(m[1]), 0);
+  return { bytes: joined, seconds };
 }
 
 /**
@@ -102,18 +109,16 @@ export function transcodeMotion(masterUrl: string): Promise<Blob> {
   return job;
 }
 
-async function run(masterUrl: string): Promise<Blob> {
-  const variant = chooseVariant(await getText(masterUrl), masterUrl);
-  if (!variant) throw new Error("The animated cover has no stream this can read");
-  const source = await downloadStream(variant.uri);
-  logger.debug("Converting an animated cover", `${(source.length / 1048576).toFixed(1)} MB`);
-
-  const started = Date.now();
+/** One piece of the cover, from `start` for `span` seconds, converted by an ffmpeg of its own. */
+async function convertPiece(source: Uint8Array, start: number, span: number | null): Promise<Uint8Array> {
   const ffmpeg = await loadFFmpeg();
   try {
-    await ffmpeg.writeFile("in.mp4", source);
+    // writeFile hands the buffer over to ffmpeg's worker, so every piece gets its own copy.
+    await ffmpeg.writeFile("in.mp4", source.slice());
     const code = await ffmpeg.exec(
       [
+        "-ss", String(start),
+        ...(span ? ["-t", String(span)] : []),
         "-i", "in.mp4",
         "-an",
         "-vf", `scale=${TARGET_SIZE}:${TARGET_SIZE},fps=${FRAME_RATE}`,
@@ -125,7 +130,6 @@ async function run(masterUrl: string): Promise<Blob> {
         "-auto-alt-ref", "0",
         "-lag-in-frames", "0",
         "-threads", "1",
-        "-t", String(MAX_SECONDS),
         "out.webm",
       ],
       TIMEOUT_MS
@@ -133,9 +137,61 @@ async function run(masterUrl: string): Promise<Blob> {
     if (code !== 0) throw new Error(`ffmpeg stopped with ${code}`);
     const data = await ffmpeg.readFile("out.webm");
     if (data.length < 1024) throw new Error("ffmpeg made an empty video");
-    logger.debug("Animated cover ready", `${(data.length / 1024).toFixed(0)} KB in ${((Date.now() - started) / 1000).toFixed(1)}s`);
-    return new Blob([data.slice().buffer as ArrayBuffer], { type: "video/webm" });
+    return data;
   } finally {
     ffmpeg.terminate();
   }
+}
+
+/** The pieces' WebM files as one, by copying (not re-encoding) them end to end. */
+async function joinPieces(pieces: Uint8Array[]): Promise<Uint8Array> {
+  const ffmpeg = await loadFFmpeg();
+  try {
+    let list = "";
+    for (const [i, piece] of pieces.entries()) {
+      await ffmpeg.writeFile(`p${i}.webm`, piece);
+      list += `file p${i}.webm\n`;
+    }
+    await ffmpeg.writeFile("list.txt", new TextEncoder().encode(list));
+    const code = await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "out.webm"], TIMEOUT_MS);
+    if (code !== 0) throw new Error(`ffmpeg stopped joining with ${code}`);
+    return await ffmpeg.readFile("out.webm");
+  } finally {
+    ffmpeg.terminate();
+  }
+}
+
+/** How many pieces to convert at once: more for a longer cover and a machine with cores to spare. */
+function pieceCount(seconds: number): number {
+  const cores = navigator.hardwareConcurrency || 4;
+  return Math.max(1, Math.min(MAX_PIECES, Math.floor(seconds / MIN_PIECE_SECONDS), cores - 2));
+}
+
+async function run(masterUrl: string): Promise<Blob> {
+  const variant = chooseVariant(await getText(masterUrl), masterUrl);
+  if (!variant) throw new Error("The animated cover has no stream this can read");
+  const { bytes: source, seconds } = await downloadStream(variant.uri);
+  logger.debug("Converting an animated cover", `${(source.length / 1048576).toFixed(1)} MB, ${seconds.toFixed(1)}s`);
+
+  const started = Date.now();
+  const length = Math.min(seconds || MAX_SECONDS, MAX_SECONDS);
+  const count = seconds ? pieceCount(length) : 1;
+
+  let data: Uint8Array;
+  if (count > 1) {
+    const span = length / count;
+    try {
+      const pieces = await Promise.all(Array.from({ length: count }, (_, i) => convertPiece(source, i * span, span)));
+      data = await joinPieces(pieces);
+    } catch (error) {
+      // Several ffmpegs at once need more memory; where that fails, the slow way still works.
+      logger.warn("Converting in pieces failed; converting in one", error);
+      data = await convertPiece(source, 0, MAX_SECONDS);
+    }
+  } else {
+    data = await convertPiece(source, 0, MAX_SECONDS);
+  }
+
+  logger.debug("Animated cover ready", `${(data.length / 1024).toFixed(0)} KB in ${((Date.now() - started) / 1000).toFixed(1)}s, ${count} piece(s)`);
+  return new Blob([data.slice().buffer as ArrayBuffer], { type: "video/webm" });
 }

@@ -34,5 +34,6 @@
     "**/*.ts",
     "**/*.tsx",
     "**/*.d.ts"
-  ]
+  ],
+  "exclude": ["node_modules", "builds", "scripts/dev"]
 }

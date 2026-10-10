@@ -109,6 +109,17 @@ Hard-won facts:
 - Direct page `fetch` is CORS-limited, so anything new that is cross-origin needs a Worker route (and a redeploy).
 - Never claim the Worker works end to end from `curl` alone: also confirm inside Spotify.
 
+### Animated covers: how matching and speed work
+
+- Lookup (`AnimatedCover.ts`): Apple's iTunes **album** search often leaves the album out (Blonde, MAYHEM, BRAT, Future Nostalgia
+  were missed), so the extension also searches by **song** and keeps editions whose artist/album names match. Up to 5 editions are
+  asked about, 3 at a time, because often only one edition (e.g. the standard, not the deluxe) has motion art. Only some albums
+  have motion art at all (about 40% of popular ones in a 40-album survey), so a missing cover is often genuine.
+- "No animated cover" answers are cached for a week under `/none2/<key>` in Cache Storage `SpicyLyrics_AnimatedCover_g1`
+  (`/none/` was the older, unreliable matching; bump the prefix again if matching changes).
+- Speed (`Transcode.ts`): conversion was single-threaded (~20 s). It now splits the clip into up to 4 pieces, converts each in its own
+  ffmpeg.wasm, and joins them with the concat demuxer (`-c copy`): ~6 s, about 8 s from song start. Falls back to one piece if that fails.
+  Timings and findings came from the debug port; the Spotify GraphQL helper only works on a fresh Spotify start (not after a page reload).
 ## 5. Testing against the real client
 
 Per `CLAUDE.md`, if `127.0.0.1:8088` serves Spotify's debugger, test there automatically. To start one:

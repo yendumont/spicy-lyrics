@@ -41,13 +41,32 @@ const pending = new Map<string, Promise<string | null>>();
 
 type AppleAlbum = { collectionId?: number; collectionName?: string; artistName?: string };
 
-/** The Apple Music ids of the albums that are this album by this artist, the exactly-named one first. */
-async function findAppleAlbums(artist: string, album: string): Promise<number[]> {
+/** How many editions of an album are looked at, and how many are asked about at once. */
+const MAX_EDITIONS = 5;
+const AT_ONCE = 3;
+
+async function itunes(term: string, entity: "album" | "song"): Promise<AppleAlbum[]> {
   const res = await fetch(
-    `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${album}`)}&entity=album&limit=8&country=us`,
+    `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=${entity}&limit=25&country=us`,
     { signal: AbortSignal.timeout(TIMEOUT_MS) }
   );
   if (!res.ok) throw new Error(`Apple's search answered ${res.status}`);
+  return ((await res.json()) as { results?: AppleAlbum[] }).results ?? [];
+}
+
+/**
+ * The Apple Music ids of the albums that are this album by this artist, best guess first.
+ *
+ * Apple's album search matches loosely and often leaves the album itself out of its answer
+ * (a famous album can lose to singles and karaoke versions), while a search for one of its songs
+ * finds it reliably. So both are asked, and an album found by its song counts for more.
+ */
+async function findAppleAlbums(artist: string, album: string, track: string): Promise<number[]> {
+  const [byAlbum, bySong] = await Promise.all([
+    itunes(`${artist} ${album}`, "album"),
+    // A failed song search must not lose the album search's answer.
+    track ? itunes(`${artist} ${track}`, "song").catch(() => [] as AppleAlbum[]) : Promise.resolve([] as AppleAlbum[]),
+  ]);
 
   const wantArtist = plain(artist);
   const wantAlbum = plain(album);
@@ -55,16 +74,40 @@ async function findAppleAlbums(artist: string, album: string): Promise<number[]>
     const a = plain(r.artistName ?? "");
     const c = plain(r.collectionName ?? "");
     return (
-      !!a && !!c && (a.includes(wantArtist) || wantArtist.includes(a)) &&
+      !!r.collectionId && !!a && !!c && (a.includes(wantArtist) || wantArtist.includes(a)) &&
       (c === wantAlbum || c.includes(wantAlbum) || wantAlbum.includes(c))
     );
   };
 
-  const results = (((await res.json()) as { results?: AppleAlbum[] }).results ?? []).filter(same);
-  results.sort(
-    (x, y) => Number(plain(y.collectionName ?? "") === wantAlbum) - Number(plain(x.collectionName ?? "") === wantAlbum)
+  const found = new Map<number, { name: string; fromSong: boolean }>();
+  for (const [list, fromSong] of [[bySong, true], [byAlbum, false]] as const) {
+    for (const r of list.filter(same)) {
+      const id = r.collectionId as number;
+      const seen = found.get(id);
+      found.set(id, { name: plain(r.collectionName ?? ""), fromSong: fromSong || !!seen?.fromSong });
+    }
+  }
+
+  // The album named exactly as asked first, then the editions of it that the song is on.
+  return [...found.entries()]
+    .sort(
+      ([, x], [, y]) =>
+        Number(y.name === wantAlbum) - Number(x.name === wantAlbum) || Number(y.fromSong) - Number(x.fromSong)
+    )
+    .slice(0, MAX_EDITIONS)
+    .map(([id]) => id);
+}
+
+/** An edition's animated cover stream, null when it has none; a Worker without the endpoint is `undefined`. */
+async function motionOf(base: string, id: number, artist: string, album: string): Promise<string | null | undefined> {
+  const res = await fetch(
+    `${base}/motion?id=${id}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`,
+    { signal: AbortSignal.timeout(TIMEOUT_MS) }
   );
-  return results.slice(0, 2).flatMap((r) => (r.collectionId ? [r.collectionId] : []));
+  // A Worker without the animated-cover update answers 404: nothing to remember about the album.
+  if (res.status === 404) return undefined;
+  if (!res.ok) throw new Error(`The Worker answered ${res.status}: ${(await res.text().catch(() => "")).slice(0, 80)}`);
+  return ((await res.json()) as { square?: string }).square ?? null;
 }
 
 async function evictOldest(cache: Cache): Promise<void> {
@@ -80,13 +123,19 @@ async function evictOldest(cache: Cache): Promise<void> {
   for (const old of saved.slice(0, videos.length - MAX_KEPT)) await cache.delete(old.request);
 }
 
-async function load(key: string, artist: string, album: string): Promise<string | null> {
+/** Remembers that an album has no animated cover, so it is not asked about again for a week. */
+async function remember(cache: Cache, key: string): Promise<void> {
+  await cache.put(`/none2/${key}`, new Response("{}", { headers: { "x-saved": String(Date.now()) } }));
+}
+
+async function load(key: string, artist: string, album: string, track: string): Promise<string | null> {
   const cache = await caches.open(CACHE);
 
   const kept = await cache.match(`/video/${key}`);
   if (kept) return URL.createObjectURL(await kept.blob());
 
-  const none = await cache.match(`/none/${key}`);
+  // "none2": answers kept before the song search was added were often wrong, so they are not used.
+  const none = await cache.match(`/none2/${key}`);
   if (none && Date.now() - Number(none.headers.get("x-saved") ?? 0) < NONE_TTL_MS) return null;
 
   const base = normalizeProxyUrl($geniusProxyUrl.get());
@@ -94,30 +143,38 @@ async function load(key: string, artist: string, album: string): Promise<string 
 
   // The album is found from here, with the listener's own address (Apple turns away searches
   // from the shared addresses a Worker runs on); the Worker only reads the album's page.
-  const ids = await findAppleAlbums(artist, album);
+  const ids = await findAppleAlbums(artist, album, track);
   if (ids.length === 0) {
-    await cache.put(`/none/${key}`, new Response("{}", { headers: { "x-saved": String(Date.now()) } }));
+    await remember(cache, key);
     return null;
   }
 
-  let square: string | undefined;
-  for (const id of ids) {
-    const res = await fetch(
-      `${base}/motion?id=${id}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`,
-      { signal: AbortSignal.timeout(TIMEOUT_MS) }
-    );
-    // A Worker without the animated-cover update answers 404: nothing to remember about the album.
-    if (res.status === 404) {
-      logger.debug("The Worker has no /motion endpoint; redeploy it for animated covers");
-      return null;
+  // An album's editions rarely all have the animated cover (often only one does), so they are
+  // asked about a few at a time, and the first in order that has one wins.
+  let square: string | null = null;
+  let failure: unknown;
+  let answered = false;
+  for (let i = 0; i < ids.length && !square; i += AT_ONCE) {
+    const batch = await Promise.allSettled(ids.slice(i, i + AT_ONCE).map((id) => motionOf(base, id, artist, album)));
+    for (const outcome of batch) {
+      if (outcome.status === "rejected") {
+        failure ??= outcome.reason;
+        continue;
+      }
+      if (outcome.value === undefined) {
+        logger.debug("The Worker has no /motion endpoint; redeploy it for animated covers");
+        return null;
+      }
+      answered = true;
+      square ??= outcome.value;
     }
-    if (!res.ok) throw new Error(`The Worker answered ${res.status}: ${(await res.text().catch(() => "")).slice(0, 80)}`);
-    square = ((await res.json()) as { square?: string }).square;
-    if (square) break;
   }
 
+  // Only an edition that really had none is remembered as none; if every one failed to answer,
+  // the problem is passed on (and not remembered) so a later play tries again.
   if (!square) {
-    await cache.put(`/none/${key}`, new Response("{}", { headers: { "x-saved": String(Date.now()) } }));
+    if (!answered && failure) throw failure;
+    await remember(cache, key);
     return null;
   }
 
@@ -127,13 +184,13 @@ async function load(key: string, artist: string, album: string): Promise<string 
   return URL.createObjectURL(video);
 }
 
-export function getAnimatedCover(artist: string, album: string): Promise<string | null> {
+export function getAnimatedCover(artist: string, album: string, track = ""): Promise<string | null> {
   const key = coverKey(artist, album);
   if (urls.has(key)) return Promise.resolve(urls.get(key) ?? null);
 
   let promise = pending.get(key);
   if (!promise) {
-    promise = load(key, artist, album)
+    promise = load(key, artist, album, track)
       .then((url) => {
         urls.set(key, url);
         return url;

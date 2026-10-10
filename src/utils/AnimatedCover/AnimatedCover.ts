@@ -128,12 +128,8 @@ async function remember(cache: Cache, key: string): Promise<void> {
   await cache.put(`/none2/${key}`, new Response("{}", { headers: { "x-saved": String(Date.now()) } }));
 }
 
-async function load(key: string, artist: string, album: string, track: string): Promise<string | null> {
-  const cache = await caches.open(CACHE);
-
-  const kept = await cache.match(`/video/${key}`);
-  if (kept) return URL.createObjectURL(await kept.blob());
-
+/** The Apple Music cover for an album, converted; null when it has none. */
+async function loadApple(cache: Cache, key: string, artist: string, album: string, track: string): Promise<Blob | null> {
   // "none2": answers kept before the song search was added were often wrong, so they are not used.
   const none = await cache.match(`/none2/${key}`);
   if (none && Date.now() - Number(none.headers.get("x-saved") ?? 0) < NONE_TTL_MS) return null;
@@ -178,25 +174,36 @@ async function load(key: string, artist: string, album: string, track: string): 
     return null;
   }
 
-  const video = await transcodeMotion(square);
-  await cache.put(`/video/${key}`, new Response(video, { headers: { "Content-Type": "video/webm", "x-saved": String(Date.now()) } }));
-  void evictOldest(cache);
-  return URL.createObjectURL(video);
+  return transcodeMotion(square);
 }
 
-export function getAnimatedCover(artist: string, album: string, track = ""): Promise<string | null> {
-  const key = coverKey(artist, album);
+/**
+ * A converted video by key, from whichever source makes it: kept in memory for this session,
+ * else in the browser cache (so every later play is instant and offline), else made by `produce`
+ * and kept. Null when there is none; a failure is reported once and not remembered, so a dropped
+ * connection or a busy moment does not hide a cover for good.
+ */
+export function memoVideo(key: string, produce: (cache: Cache) => Promise<Blob | null>): Promise<string | null> {
   if (urls.has(key)) return Promise.resolve(urls.get(key) ?? null);
 
   let promise = pending.get(key);
   if (!promise) {
-    promise = load(key, artist, album, track)
+    promise = (async () => {
+      const cache = await caches.open(CACHE);
+      const kept = await cache.match(`/video/${key}`);
+      if (kept) return URL.createObjectURL(await kept.blob());
+
+      const video = await produce(cache);
+      if (!video) return null;
+      await cache.put(`/video/${key}`, new Response(video, { headers: { "Content-Type": "video/webm", "x-saved": String(Date.now()) } }));
+      void evictOldest(cache);
+      return URL.createObjectURL(video);
+    })()
       .then((url) => {
         urls.set(key, url);
         return url;
       })
       .catch((error) => {
-        // Not remembered: a dropped connection or a busy moment should not hide the cover for good.
         logger.warn("Could not get an animated cover", error);
         // Said once per kind of problem: otherwise the cover is just missing, with no hint why.
         const message = error instanceof Error ? error.message : String(error);
@@ -210,4 +217,9 @@ export function getAnimatedCover(artist: string, album: string, track = ""): Pro
     pending.set(key, promise);
   }
   return promise;
+}
+
+export function getAnimatedCover(artist: string, album: string, track = ""): Promise<string | null> {
+  const key = coverKey(artist, album);
+  return memoVideo(key, (cache) => loadApple(cache, key, artist, album, track));
 }

@@ -2,25 +2,24 @@ import Global from "../../components/Global/Global.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import { PageContainer } from "../../components/Pages/PageView.ts";
 import { onExperimentChange, isExperimentEnabled } from "../experiments.ts";
-import { ResolveTrack } from "../Lyrics/providers/Resolve.ts";
 import { $isNowBarOpen } from "../uiState.ts";
-import { coverKey, getAnimatedCover } from "./AnimatedCover.ts";
+import { dropVideo, getMotion, loopVideo, pauseOrResumeAll } from "./Motion.ts";
+import { initLiveBackground } from "./LiveBackground.ts";
 
 /**
- * Plays an album's animated cover over the still cover in the Now Bar (the cover in
- * Fullscreen and in the larger view). The still cover stays underneath, so nothing
- * changes while the video is made or if the album has none.
+ * Plays the song's animated cover (its Spotify Canvas, or its album's animated cover from
+ * Apple Music) over the still cover in the Now Bar (the cover in Fullscreen and in the larger
+ * view). The still cover stays underneath, so nothing changes while the video is made or if
+ * the song has none. A Canvas is tall, so the box crops it to the cover's shape.
  */
 const CONTAINER = ".ContentBox .NowBar .Header .MediaBox .MediaImageContainer";
 
-let attached: { key: string; video: HTMLVideoElement } | null = null;
+let attached: { signature: string; video: HTMLVideoElement } | null = null;
 let generation = 0;
 
 function detach(): void {
   if (!attached) return;
-  attached.video.pause();
-  attached.video.removeAttribute("src");
-  attached.video.remove();
+  dropVideo(attached.video);
   PageContainer?.querySelector(CONTAINER)?.classList.remove("HasAnimatedCover");
   attached = null;
 }
@@ -29,48 +28,28 @@ function detach(): void {
 export async function syncAnimatedCover(): Promise<void> {
   const mine = ++generation;
   const container = PageContainer?.querySelector<HTMLElement>(CONTAINER);
+  const use = { apple: isExperimentEnabled("animatedCover"), canvas: isExperimentEnabled("spotifyCanvas") };
 
-  if (!isExperimentEnabled("animatedCover") || !container?.isConnected || !$isNowBarOpen.get()) {
+  if ((!use.apple && !use.canvas) || !container?.isConnected || !$isNowBarOpen.get()) {
     detach();
     return;
   }
 
-  const reading = (await ResolveTrack()).readings[0];
-  if (mine !== generation) return;
-  if (!reading?.album || !reading.artist) {
-    detach();
-    return;
-  }
-
-  const key = coverKey(reading.artist, reading.album);
-  if (attached?.key === key && attached.video.isConnected && container.contains(attached.video)) return;
+  // What is wanted: this song, with these sources. If that is already showing, there is nothing to do.
+  const signature = `${SpotifyPlayer.GetUri()}|${use.apple}|${use.canvas}`;
+  if (attached?.signature === signature && attached.video.isConnected && container.contains(attached.video)) return;
   detach();
 
-  const url = await getAnimatedCover(reading.artist, reading.album, reading.name);
-  // The song may have changed, or the cover been closed, while the video was being made.
-  if (mine !== generation || !url) return;
+  // The song may change, or the cover be closed, while the video is being made.
+  const motion = await getMotion(use, () => mine === generation);
+  if (mine !== generation || !motion) return;
   const live = PageContainer?.querySelector<HTMLElement>(CONTAINER);
   if (!live?.isConnected) return;
 
-  const video = document.createElement("video");
-  video.className = "AnimatedCoverVideo";
-  video.muted = true;
-  video.loop = true;
-  video.playsInline = true;
-  video.disablePictureInPicture = true;
-  video.src = url;
-  video.addEventListener(
-    "canplay",
-    () => {
-      if (attached?.video !== video) return;
-      video.classList.add("Ready");
-      if (SpotifyPlayer.IsPlaying && !document.hidden) void video.play().catch(() => undefined);
-    },
-    { once: true }
-  );
+  const video = loopVideo(live.ownerDocument, "AnimatedCoverVideo", motion);
   live.classList.add("HasAnimatedCover");
   live.appendChild(video);
-  attached = { key, video };
+  attached = { signature, video };
 }
 
 let started = false;
@@ -89,16 +68,11 @@ export function initAnimatedCover(): void {
   }
   $isNowBarOpen.listen(() => void syncAnimatedCover());
   onExperimentChange((experiment) => {
-    if (experiment.id === "animatedCover") void syncAnimatedCover();
+    if (experiment.id === "animatedCover" || experiment.id === "spotifyCanvas") void syncAnimatedCover();
   });
 
-  // A video that is not being looked at should not be running.
-  const pauseOrResume = () => {
-    const video = attached?.video;
-    if (!video?.classList.contains("Ready")) return;
-    if (document.hidden || !Spicetify.Player.isPlaying()) video.pause();
-    else void video.play().catch(() => undefined);
-  };
-  Global.Event.listen("playback:playpause", pauseOrResume);
-  document.addEventListener("visibilitychange", pauseOrResume);
+  Global.Event.listen("playback:playpause", pauseOrResumeAll);
+  document.addEventListener("visibilitychange", pauseOrResumeAll);
+
+  initLiveBackground();
 }

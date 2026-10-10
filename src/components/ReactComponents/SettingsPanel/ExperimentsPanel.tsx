@@ -1,10 +1,12 @@
 import { useStore } from "@nanostores/react";
 import {
   $experiment,
+  $experimentSlider,
   EXPERIMENTS,
+  type Experiment,
   type RegisteredExperiment,
 } from "../../../utils/experiments.ts";
-import { Row, Toggle } from "./components.tsx";
+import { Row, Slider, Toggle } from "./components.tsx";
 
 /**
  * The Experiments sub-panel. Renders straight off the EXPERIMENTS registry, so a
@@ -50,9 +52,40 @@ function ExperimentRow({ experiment }: { experiment: RegisteredExperiment }) {
   const store = $experiment(experiment.id);
   const enabled = useStore(store);
 
+  const slider = (experiment as Experiment).slider;
+
   return (
-    <Row label={experiment.label} description={experiment.description}>
-      <Toggle checked={enabled} onChange={(v) => store.set(v)} />
+    <>
+      <Row label={experiment.label} description={experiment.description}>
+        <Toggle checked={enabled} onChange={(v) => store.set(v)} />
+      </Row>
+      {/* The setting an experiment brings with it, only while it is on. */}
+      {slider && enabled && <ExperimentSlider id={experiment.id} slider={slider} />}
+    </>
+  );
+}
+
+function ExperimentSlider({
+  id,
+  slider,
+}: {
+  id: RegisteredExperiment["id"];
+  slider: NonNullable<Experiment["slider"]>;
+}) {
+  const store = $experimentSlider(id);
+  const value = useStore(store);
+
+  return (
+    <Row label={slider.label} description={slider.description} stacked>
+      <Slider
+        value={value}
+        min={slider.min}
+        max={slider.max}
+        step={slider.step}
+        defaultValue={slider.default}
+        unit={slider.unit}
+        onChange={(v) => store.set(v)}
+      />
     </Row>
   );
 }

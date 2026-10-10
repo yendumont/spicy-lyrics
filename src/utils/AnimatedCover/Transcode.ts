@@ -110,7 +110,7 @@ export function transcodeMotion(masterUrl: string): Promise<Blob> {
 }
 
 /** One piece of the cover, from `start` for `span` seconds, converted by an ffmpeg of its own. */
-async function convertPiece(source: Uint8Array, start: number, span: number | null): Promise<Uint8Array> {
+async function convertPiece(source: Uint8Array, start: number, span: number | null, scale: string): Promise<Uint8Array> {
   const ffmpeg = await loadFFmpeg();
   try {
     // writeFile hands the buffer over to ffmpeg's worker, so every piece gets its own copy.
@@ -121,7 +121,7 @@ async function convertPiece(source: Uint8Array, start: number, span: number | nu
         ...(span ? ["-t", String(span)] : []),
         "-i", "in.mp4",
         "-an",
-        "-vf", `scale=${TARGET_SIZE}:${TARGET_SIZE},fps=${FRAME_RATE}`,
+        "-vf", `scale=${scale},fps=${FRAME_RATE}`,
         "-c:v", "libvpx",
         "-b:v", "1200k",
         "-deadline", "realtime",
@@ -162,9 +162,37 @@ async function joinPieces(pieces: Uint8Array[]): Promise<Uint8Array> {
 }
 
 /** How many pieces to convert at once: more for a longer cover and a machine with cores to spare. */
-function pieceCount(seconds: number): number {
+function pieceCount(seconds: number, minPiece: number): number {
   const cores = navigator.hardwareConcurrency || 4;
-  return Math.max(1, Math.min(MAX_PIECES, Math.floor(seconds / MIN_PIECE_SECONDS), cores - 2));
+  return Math.max(1, Math.min(MAX_PIECES, Math.floor(seconds / minPiece), cores - 2));
+}
+
+/**
+ * Convert already-downloaded video into a WebM, in parallel pieces where it is long enough.
+ * `scale` is ffmpeg's size, "540:540" for a square cover or "540:-2" to keep the shape.
+ */
+async function convertVideo(source: Uint8Array, seconds: number, scale: string, minPiece = MIN_PIECE_SECONDS): Promise<Uint8Array> {
+  const started = Date.now();
+  const length = Math.min(seconds || MAX_SECONDS, MAX_SECONDS);
+  const count = seconds ? pieceCount(length, minPiece) : 1;
+
+  let data: Uint8Array;
+  if (count > 1) {
+    const span = length / count;
+    try {
+      const pieces = await Promise.all(Array.from({ length: count }, (_, i) => convertPiece(source, i * span, span, scale)));
+      data = await joinPieces(pieces);
+    } catch (error) {
+      // Several ffmpegs at once need more memory; where that fails, the slow way still works.
+      logger.warn("Converting in pieces failed; converting in one", error);
+      data = await convertPiece(source, 0, MAX_SECONDS, scale);
+    }
+  } else {
+    data = await convertPiece(source, 0, MAX_SECONDS, scale);
+  }
+
+  logger.debug("Animated cover ready", `${(data.length / 1024).toFixed(0)} KB in ${((Date.now() - started) / 1000).toFixed(1)}s, ${count} piece(s)`);
+  return data;
 }
 
 async function run(masterUrl: string): Promise<Blob> {
@@ -172,26 +200,43 @@ async function run(masterUrl: string): Promise<Blob> {
   if (!variant) throw new Error("The animated cover has no stream this can read");
   const { bytes: source, seconds } = await downloadStream(variant.uri);
   logger.debug("Converting an animated cover", `${(source.length / 1048576).toFixed(1)} MB, ${seconds.toFixed(1)}s`);
-
-  const started = Date.now();
-  const length = Math.min(seconds || MAX_SECONDS, MAX_SECONDS);
-  const count = seconds ? pieceCount(length) : 1;
-
-  let data: Uint8Array;
-  if (count > 1) {
-    const span = length / count;
-    try {
-      const pieces = await Promise.all(Array.from({ length: count }, (_, i) => convertPiece(source, i * span, span)));
-      data = await joinPieces(pieces);
-    } catch (error) {
-      // Several ffmpegs at once need more memory; where that fails, the slow way still works.
-      logger.warn("Converting in pieces failed; converting in one", error);
-      data = await convertPiece(source, 0, MAX_SECONDS);
-    }
-  } else {
-    data = await convertPiece(source, 0, MAX_SECONDS);
-  }
-
-  logger.debug("Animated cover ready", `${(data.length / 1024).toFixed(0)} KB in ${((Date.now() - started) / 1000).toFixed(1)}s, ${count} piece(s)`);
+  const data = await convertVideo(source, seconds, `${TARGET_SIZE}:${TARGET_SIZE}`);
   return new Blob([data.slice().buffer as ArrayBuffer], { type: "video/webm" });
+}
+
+/** How long an MP4 plays, read from its header (0 when it can't be read). */
+function mp4Seconds(bytes: Uint8Array): number {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let i = 4; i + 32 < bytes.length; i++) {
+    // "mvhd": the movie header, which carries the timescale and the duration.
+    if (bytes[i] !== 0x6d || bytes[i + 1] !== 0x76 || bytes[i + 2] !== 0x68 || bytes[i + 3] !== 0x64) continue;
+    const version = bytes[i + 4];
+    const timescale = view.getUint32(i + (version === 1 ? 24 : 16));
+    const duration = version === 1 ? Number(view.getBigUint64(i + 28)) : view.getUint32(i + 20);
+    return timescale ? duration / timescale : 0;
+  }
+  return 0;
+}
+
+// A Canvas is tall (9:16). It is kept in that shape, wide enough to be sharp when cropped to a
+// square cover and when stretched across a background (which is blurred anyway).
+const CANVAS_SCALE = "540:-2";
+const CANVAS_MAX_BYTES = 12 * 1024 * 1024;
+const CANVAS_MIN_PIECE_SECONDS = 2;
+
+/** A Spotify Canvas (an MP4) as a WebM that keeps its shape. Shares the one-at-a-time queue. */
+export function transcodeCanvas(url: string): Promise<Blob> {
+  const job = queue.then(async () => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`The Canvas answered ${res.status}`);
+    const source = new Uint8Array(await res.arrayBuffer());
+    if (source.length > CANVAS_MAX_BYTES) throw new Error("The Canvas is bigger than expected");
+    const seconds = mp4Seconds(source);
+    logger.debug("Converting a Canvas", `${(source.length / 1048576).toFixed(1)} MB, ${seconds.toFixed(1)}s`);
+    // A Canvas is only a few seconds long, so its pieces are shorter than a cover's to still be shared out.
+    const data = await convertVideo(source, seconds, CANVAS_SCALE, CANVAS_MIN_PIECE_SECONDS);
+    return new Blob([data.slice().buffer as ArrayBuffer], { type: "video/webm" });
+  });
+  queue = job.catch(() => undefined);
+  return job;
 }

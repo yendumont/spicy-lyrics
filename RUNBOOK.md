@@ -294,6 +294,24 @@ no animated cover, so nothing changes for them.
   versions, replace the URLs and hashes there together.
 - It pauses with the music and when Spotify is hidden. Turning the experiment off removes
   the video straight away.
+
+### Spotify Canvas and the live background (two more experiments)
+
+Settings, Experiments (both off by default):
+
+- **Spotify Canvas as Animated Cover.** A song's Canvas (the short looping video artists add)
+  plays over the still cover the same way. Spotify already hands the extension its address
+  (the playing track's `canvas.url`), and the file can be fetched directly, so **no Worker
+  change is needed**. It is H.264 too, so it is converted once like Apple's (a few seconds,
+  split over several cores), kept in the same cache, and then instant. A Canvas is tall
+  (9:16): it keeps its shape and the cover box crops it to a square. A song's Canvas takes
+  the place of Apple's cover when it has one; songs without use Apple's if that experiment
+  is on. Most popular songs have a Canvas, far more than have an Apple cover.
+- **Live Video Background.** The same video fills the background of Fullscreen and the
+  larger view, darkened and blurred behind the lyrics; the normal animated background stays
+  underneath and shows for songs with no video. It tries both sources by itself, so it works
+  without the two cover experiments being on. **Background Blur** (0 to 60 px, default 24)
+  appears under it while it is on, and changes straight away.
 ## Genius fallback (optional)
 
 Genius is a provider in the **Lyrics Provider Priority** list, last in the default order. With

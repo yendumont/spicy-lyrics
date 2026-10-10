@@ -16,6 +16,7 @@ import { persistAtom } from "./stores.ts";
  *     default: true,
  *     pageClass: "Exp_MyExperiment",   // optional — toggled on #SpicyLyricsPage
  *     rebuildsNowBar: true,            // optional — see below
+ *     slider: { label, min, max, step, default, unit },   // optional — see below
  *   }
  *
  * `pageClass` is the preferred way to implement one: write the new look under
@@ -25,6 +26,9 @@ import { persistAtom } from "./stores.ts";
  * `rebuildsNowBar` is only for experiments whose *markup* differs between states
  * (CSS alone can't get you there). It makes NowBar tear down and rebuild the
  * fullscreen overlay when the flag flips.
+ *
+ * `slider` gives the experiment one adjustable number, shown under its switch while it is on.
+ * Read it with `$experimentSlider(id)` (a persisted store: `.get()` and `.listen()`).
  */
 
 export type Experiment = {
@@ -37,6 +41,8 @@ export type Experiment = {
   pageClass?: string;
   /** Rebuild the fullscreen NowBar overlay when this flag changes. */
   rebuildsNowBar?: boolean;
+  /** One adjustable number, persisted as `experimentValue:<id>` and shown while the experiment is on. */
+  slider?: { label: string; description?: string; min: number; max: number; step: number; default: number; unit?: string };
 };
 
 export const EXPERIMENTS = [
@@ -78,6 +84,21 @@ export const EXPERIMENTS = [
       "Looks up lyrics for songs you play from local files and for audio podcast episodes. They have no real artist on Spotify, so the artist is guessed from the title (\"Artist - Song\", \"Song by Artist\") and the lyrics providers are searched for the closest match, preferring word and line sync. Can occasionally pick the wrong song. Disable to restore the \"not supported\" notice.",
     default: false,
   },
+  {
+    id: "spotifyCanvas",
+    label: "Spotify Canvas as Animated Cover",
+    description:
+      "Plays a song's Spotify Canvas (the short looping video artists add to their songs) over the still cover in Fullscreen and the larger view. A song's Canvas takes the place of Apple's album cover when it has one; songs without a Canvas still use Apple's if that experiment is on. Canvases are tall, so they are cropped to the cover's shape. Like Apple's, each Canvas is converted once on your PC (a few seconds) for Spotify to play it. Disable to stop using Canvas.",
+    default: false,
+  },
+  {
+    id: "liveBackground",
+    label: "Live Video Background",
+    description:
+      "Fills the background of Fullscreen and the larger view with the song's animated video (its Spotify Canvas, or Apple Music's animated cover if it has none), darkened and blurred behind the lyrics. Songs with neither keep the normal background. Works without the two animated cover experiments being on. Disable to go back to the normal background.",
+    default: false,
+    slider: { label: "Background Blur", description: "How much the video is blurred. 0 is sharp.", min: 0, max: 60, step: 1, default: 24, unit: "px" },
+  },
 ] as const satisfies readonly Experiment[];
 
 /** A registry entry, narrowed to its literal `id` — what the UI iterates over. */
@@ -95,6 +116,19 @@ const stores = new Map<string, ExperimentStore>(
 export function $experiment(id: ExperimentId): ExperimentStore {
   const store = stores.get(id);
   if (!store) throw new Error(`Unknown experiment "${id}"`);
+  return store;
+}
+
+const sliders = new Map(
+  (EXPERIMENTS as readonly Experiment[]).flatMap((exp) =>
+    exp.slider ? [[exp.id, persistAtom<number>(`experimentValue:${exp.id}`, exp.slider.default)] as const] : []
+  )
+);
+
+/** The persisted number of an experiment that has a slider. */
+export function $experimentSlider(id: ExperimentId): ReturnType<typeof persistAtom<number>> {
+  const store = sliders.get(id);
+  if (!store) throw new Error(`Experiment "${id}" has no slider`);
   return store;
 }
 

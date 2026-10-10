@@ -24,7 +24,7 @@ export default function ExperimentsSection({ query, sectionFilter, onOpen }: Pro
 
   if (!hit) return null;
 
-  const count = EXPERIMENTS.length;
+  const count: number = EXPERIMENTS.length;
 
   return (
     <>

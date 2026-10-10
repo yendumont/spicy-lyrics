@@ -27,9 +27,9 @@ The fork adds, on top of upstream:
 
 ## 2. Environment and workflow (Windows)
 
-- Repo: `%USERPROFILE%\Documents\GitHub\spicy-lyrics`. Shell is PowerShell 5.1 (no `&&`).
+- Repo: the working folder of the checkout. Shell is PowerShell 5.1 (no `&&`).
 - **`git` is not on PATH** in the agent's PowerShell. Use
-  `%USERPROFILE%\AppData\Local\GitHubDesktop\app-3.6.6\resources\app\git\cmd\git.exe`.
+  `%LOCALAPPDATA%\GitHubDesktop\app-<version>\resources\app\git\cmd\git.exe` (GitHub Desktop's bundled git).
 - `node` and `wrangler` are **not installed**. bun is. The user deploys the Worker by pasting `worker.js` into the
   Cloudflare dashboard; you cannot deploy it. After a Worker change, tell them to redeploy, then test the live URL.
 - Build + install + restart Spotify: `powershell -ExecutionPolicy Bypass -File scripts\install-spicetify.ps1 -SkipInstall`
@@ -91,7 +91,7 @@ do a raw `Spicetify.LocalStorage.set(...)` and reload immediately.
 
 ## 4. The Worker (`workers/genius-proxy/worker.js`)
 
-Deployed by the user at `https://<name>.workers.dev` (set as `geniusProxyUrl`). It only answers
+Deployed by the user on their own Cloudflare account, at a `https://<name>.workers.dev` address (set as `geniusProxyUrl`). It only answers
 requests whose Origin is `https://xpui.app.spotify.com`, holds no secrets, and is not an open proxy. Why it exists:
 Spotify's page can't read Genius/YouTube Music/Apple (no CORS) and `Spicetify.CosmosAsync` drops request headers.
 

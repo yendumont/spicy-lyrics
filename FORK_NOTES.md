@@ -136,6 +136,29 @@ Hard-won facts:
 - Verified in Spotify via the debug port: Levitating/Espresso/Disease/Paint The Town Red Canvases convert in about 2-6 s and show on the cover and background at 540x960;
   the slider changes the blur live; settings restored afterwards. The Apple-fallback branch of `getMotion` was not re-tested (it is unchanged logic) because nearly every
   test song had a Canvas.
+### Video songs (`videoSongs` experiment, default on)
+
+- Tracks Spotify plays as music videos have `Player.data.item.mediaType === "video"` (still `type: "track"`, normal track URI). `fetchLyrics.ts` used to stop them
+  with the "video lyrics" notice; with the experiment on they go through the normal pipeline (verified: "For The Better" got lyrics from NetEase).
+  Video podcasts (`mixed`) are still refused.
+- `utils/VideoSongs.ts` shows the real video in the Now Bar cover. Spotify's video is a protected (EME, `video.mediaKeys`) MSE `<video>` inside
+  `.VideoPlayer__container` in the Now Playing sidebar: `captureStream` is refused and a canvas copy would be black, and a `position:fixed` overlay is
+  clipped/offset by transformed `overflow:hidden` ancestors. What works is moving the `<video>` element itself into `.MediaImageContainer` (it keeps playing, in sync).
+  Only the `<video>` moves, never `.VideoPlayer__container` (React owns it and would throw on removing a node that moved). A temporary `Node.prototype.removeChild`
+  guard makes Spotify's own `container.removeChild(video)` a no-op while the video is held. It goes home on song change, `page:destroy`, sidebar/NowBar changes, and is
+  re-held by a 700 ms check (only runs for video songs). The cover box becomes 16:9 via `.HasPlayerVideo` + `--PlayerVideoAspect` (CSS in `Extras.css`).
+- **Audio twin.** A video song has its own track id (and often a longer cut and a title like `Song (feat. X)`) that Spicy's API has never heard of; its metadata names the audio
+  track in `audio_association`. `Resolve.ts` reads that track with the `getTrack` GraphQL query (`videoTwin`). Spicy is asked about the twin's id (`spicyIdForVideoSong`, used by
+  `fetchLyrics.ts` and `SpicyApi.ts`) and every provider also gets the twin as a second reading, **but only when the two lengths are within 3.5 s** (`TWIN_MAX_DRIFT_MS`):
+  timed lyrics made for the audio cut would run early/late against a longer video, so otherwise Spicy is skipped (`notfound`) and only the video's own title and length are searched.
+  Lyrics are still cached under the video's own id so they never leak into the audio track's cache. Checked on `For The Better` (twin 130.6 s vs video 133 s: Spicy word-synced) and
+  `Levitating (feat. DaBaby)` (203.8 s vs 232 s: twin skipped; only LRCLIB and Genius had matching records).
+- **Video in the background.** `liveBackground` has a `toggle` (`experimentOption:liveBackground`, see `experiments.ts`): when on, a video song's real `<video>` is moved into `.ContentBox` with the
+  `LiveBackgroundVideo` class (same blur/darkening as the Canvas background) instead of the cover. The one element cannot be in two places (EME: no `captureStream`, no canvas copy), so the cover then shows the song's normal cover (`SpotifyPlayer.GetCover` returns the audio track's `audio_association_image*` while `videoSongInBackground()` (`utils/videoSongMode.ts`) is true)
+  or its animated Canvas/Apple cover: Canvas is read for the audio twin with `Definitions.canvas` `{trackUri}` (works for any track; `Canvas.ts`) and Apple is looked up by the twin's album too (`Motion.ts`). `VideoSongs.ts` exports `heldMode()`/`onHeldChange` so the animated cover and the Canvas/Apple background step aside only while the real video is actually held.
+- LRCLIB''s `/get` often answers 503 while `/search` works; `LrcLib.ts` now falls back to search instead of reporting Failed.
+- Spotify only creates the `<video>` when its video mode is really on; after a restart it can be on in settings yet have no element until the sidebar's
+  "Switch to audio"/"Switch to video" is toggled (the sidebar must be open). Animated covers/Canvas are skipped for video songs.
 ## 5. Testing against the real client
 
 Per `CLAUDE.md`, if `127.0.0.1:8088` serves Spotify's debugger, test there automatically. To start one:

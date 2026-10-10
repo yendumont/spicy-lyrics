@@ -23,10 +23,13 @@ export async function getMotion(use: MotionUse, isCurrent: () => boolean): Promi
   }
 
   if (use.apple) {
-    const reading = (await ResolveTrack()).readings[0];
+    const resolved = await ResolveTrack();
     if (!isCurrent()) return null;
-    if (reading?.album && reading.artist) {
+    // The song as it is, then (for a video song) the audio track it belongs to, whose album is the one Apple has.
+    for (const reading of [resolved.readings[0], resolved.twin]) {
+      if (!reading?.album || !reading.artist) continue;
       const url = await getAnimatedCover(reading.artist, reading.album, reading.name);
+      if (!isCurrent()) return null;
       if (url) return { url, kind: "apple" };
     }
   }

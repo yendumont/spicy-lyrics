@@ -39,6 +39,7 @@ import { IsPlaying } from "./utils/Addons.ts";
 import { isExperimentEnabled } from "./utils/experiments.ts";
 import { initLineExtras } from "./utils/Lyrics/Extras/index.ts";
 import { initAnimatedCover } from "./utils/AnimatedCover/index.ts";
+import { initVideoSongs } from "./utils/VideoSongs.ts";
 import { requestPositionSync } from "./utils/Gets/GetProgress.ts";
 import { IntervalManager } from "./utils/IntervalManager.ts";
 import fetchLyrics, { SetLyricsUpgradeHandler } from "./utils/Lyrics/fetchLyrics.ts";
@@ -802,6 +803,7 @@ async function main() {
     // Line meanings and translations, added to the lyrics lines as they arrive.
     initLineExtras();
     initAnimatedCover();
+    initVideoSongs();
     // A lyrics search that carries on after its first result was shown swaps better lyrics in.
     SetLyricsUpgradeHandler((result) => {
       void ApplyLyrics(result);

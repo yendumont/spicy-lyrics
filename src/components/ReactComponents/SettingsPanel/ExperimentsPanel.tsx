@@ -2,6 +2,7 @@ import { useStore } from "@nanostores/react";
 import {
   $experiment,
   $experimentSlider,
+  $experimentToggle,
   EXPERIMENTS,
   type Experiment,
   type RegisteredExperiment,
@@ -53,6 +54,7 @@ function ExperimentRow({ experiment }: { experiment: RegisteredExperiment }) {
   const enabled = useStore(store);
 
   const slider = (experiment as Experiment).slider;
+  const toggle = (experiment as Experiment).toggle;
 
   return (
     <>
@@ -61,6 +63,7 @@ function ExperimentRow({ experiment }: { experiment: RegisteredExperiment }) {
       </Row>
       {/* The setting an experiment brings with it, only while it is on. */}
       {slider && enabled && <ExperimentSlider id={experiment.id} slider={slider} />}
+      {toggle && enabled && <ExperimentToggle id={experiment.id} toggle={toggle} />}
     </>
   );
 }
@@ -86,6 +89,23 @@ function ExperimentSlider({
         unit={slider.unit}
         onChange={(v) => store.set(v)}
       />
+    </Row>
+  );
+}
+
+function ExperimentToggle({
+  id,
+  toggle,
+}: {
+  id: RegisteredExperiment["id"];
+  toggle: NonNullable<Experiment["toggle"]>;
+}) {
+  const store = $experimentToggle(id);
+  const checked = useStore(store);
+
+  return (
+    <Row label={toggle.label} description={toggle.description}>
+      <Toggle checked={checked} onChange={(v) => store.set(v)} />
     </Row>
   );
 }

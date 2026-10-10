@@ -19,6 +19,8 @@ export type ResolvedTrack = {
   readings: TrackInfo[];
   /** The catalogue entry a local file or episode matched, if any. */
   catalogue: CatalogueMatch | null;
+  /** For a video song, its audio track (whatever its length): what covers and artwork are looked up by. */
+  twin?: TrackInfo;
 };
 
 /**
@@ -29,6 +31,86 @@ export function IsUnlistedItem(uri: string | undefined): boolean {
   if (!isExperimentEnabled("unlistedLyrics")) return false;
   return !!uri?.startsWith("spotify:local:") || SpotifyPlayer.GetContentType() === "episode";
 }
+
+// ── Video songs ──────────────────────────────────────────────────────────────
+// A song Spotify plays as a music video is a track of its own (its own id, often a longer
+// cut and a title like "Song (feat. X)"), which Spicy Lyrics' API has never heard of. Spotify
+// names the ordinary audio track it belongs to in the item's `audio_association`.
+
+/** The audio track a playing video song belongs to, if it names one. */
+export function videoTwinUri(): string | undefined {
+  if (!isExperimentEnabled("videoSongs") || SpotifyPlayer.GetMediaType() !== "video") return undefined;
+  const meta = Spicetify?.Player?.data?.item?.metadata as Record<string, string> | undefined;
+  const twin = meta?.audio_association;
+  return twin?.startsWith("spotify:track:") && twin !== SpotifyPlayer.GetUri() ? twin : undefined;
+}
+
+type Twin = { id: string; info: TrackInfo };
+const twins = new Map<string, Promise<Twin | null>>();
+
+async function loadTwin(uri: string): Promise<Twin | null> {
+  try {
+    const gql = Spicetify.GraphQL;
+    const response: any = await gql.Request((gql.Definitions as any).getTrack, { uri });
+    const track = response?.data?.trackUnion;
+    const artists: string[] = [...(track?.firstArtist?.items ?? []), ...(track?.otherArtists?.items ?? [])]
+      .map((a: any) => a?.profile?.name)
+      .filter(Boolean);
+    if (!track?.id || !track?.name || artists.length === 0) return null;
+    const cover: string | undefined = [...(track.albumOfTrack?.coverArt?.sources ?? [])].sort(
+      (a: any, b: any) => (b?.width ?? 0) - (a?.width ?? 0)
+    )[0]?.url;
+    return {
+      id: track.id,
+      info: {
+        name: track.name,
+        artist: artists[0],
+        artists,
+        album: track.albumOfTrack?.name ?? "",
+        spotifyId: track.id,
+        coverUrl: cover,
+        durationMs: track.duration?.totalMilliseconds ?? 0,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** The audio track of the playing video song, read once per song. */
+export function videoTwin(): Promise<Twin | null> {
+  const uri = videoTwinUri();
+  if (!uri) return Promise.resolve(null);
+  let known = twins.get(uri);
+  if (!known) {
+    known = loadTwin(uri);
+    twins.set(uri, known);
+    while (twins.size > MEMORY) twins.delete(twins.keys().next().value as string);
+    // A failed lookup says nothing about the song; ask again next time.
+    void known.then((twin) => twin || twins.delete(uri));
+  }
+  return known;
+}
+
+/** Spicy's lyrics are timed to the audio track, so they only fit the video if both are about as long. */
+const TWIN_MAX_DRIFT_MS = 3500;
+
+/**
+ * Which track id Spicy Lyrics' API should be asked about for the playing item: `undefined` for
+ * an ordinary song (use its own id), the audio track's id for a video song that matches it in
+ * length, and `null` for a video song whose audio track is too different to share its timing.
+ */
+export async function spicyIdForVideoSong(): Promise<string | null | undefined> {
+  if (!videoTwinUri()) return undefined;
+  const twin = await videoTwin();
+  if (!twin) return undefined;
+  const drift = Math.abs(twin.info.durationMs - SpotifyPlayer.GetDuration());
+  return drift <= TWIN_MAX_DRIFT_MS ? twin.id : null;
+}
+
+const sameSong = (a: TrackInfo, b: TrackInfo): boolean =>
+  a.name.trim().toLowerCase() === b.name.trim().toLowerCase() &&
+  a.artist.trim().toLowerCase() === b.artist.trim().toLowerCase();
 
 /** The playing item's cover as an https URL, or undefined when it only has the placeholder. */
 function currentCoverUrl(): string | undefined {
@@ -49,19 +131,25 @@ async function resolve(uri: string | undefined, isStale: () => boolean): Promise
 
   if (!IsUnlistedItem(uri)) {
     if (artists.length === 0) return { readings: [], catalogue: null };
+    const own: TrackInfo = {
+      name,
+      artist: artists[0],
+      artists,
+      album: SpotifyPlayer.GetAlbumName() ?? "",
+      spotifyId: SpotifyPlayer.GetId(),
+      coverUrl: currentCoverUrl(),
+      durationMs,
+    };
+    // A video song is looked up as itself first (the video can be a different cut, with its own
+    // title), then as its audio track, which providers may know it as. Timed lyrics made for
+    // the audio track would run early or late against a video of another length, so that second
+    // reading is only added when the two are about as long.
+    const twin = await videoTwin();
+    const fits = !!twin && Math.abs(twin.info.durationMs - durationMs) <= TWIN_MAX_DRIFT_MS;
     return {
       catalogue: null,
-      readings: [
-        {
-          name,
-          artist: artists[0],
-          artists,
-          album: SpotifyPlayer.GetAlbumName() ?? "",
-          spotifyId: SpotifyPlayer.GetId(),
-          coverUrl: currentCoverUrl(),
-          durationMs,
-        },
-      ],
+      readings: twin && fits && !sameSong(twin.info, own) ? [own, twin.info] : [own],
+      twin: twin?.info,
     };
   }
 

@@ -34,7 +34,7 @@ import type { ExternalProviderId, LyricsProviderId, TrackInfo } from "./types.ts
 
 export type { ExternalProviderId, LyricsProviderId } from "./types.ts";
 export { DEFAULT_ORDER, PROVIDER_LABELS, activeProviders, resolveOrder } from "./ProviderOrder.ts";
-export { IsUnlistedItem, ResolveTrack, spotifyIdOf } from "./Resolve.ts";
+export { IsUnlistedItem, ResolveTrack, spicyIdForVideoSong, spotifyIdOf } from "./Resolve.ts";
 
 const logger = new Logger("Lyrics Providers");
 

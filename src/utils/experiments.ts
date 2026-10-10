@@ -17,6 +17,7 @@ import { persistAtom } from "./stores.ts";
  *     pageClass: "Exp_MyExperiment",   // optional — toggled on #SpicyLyricsPage
  *     rebuildsNowBar: true,            // optional — see below
  *     slider: { label, min, max, step, default, unit },   // optional — see below
+ *     toggle: { label, description, default },            // optional — see below
  *   }
  *
  * `pageClass` is the preferred way to implement one: write the new look under
@@ -43,6 +44,8 @@ export type Experiment = {
   rebuildsNowBar?: boolean;
   /** One adjustable number, persisted as `experimentValue:<id>` and shown while the experiment is on. */
   slider?: { label: string; description?: string; min: number; max: number; step: number; default: number; unit?: string };
+  /** One extra on/off choice, persisted as `experimentOption:<id>` and shown while the experiment is on. */
+  toggle?: { label: string; description?: string; default: boolean };
 };
 
 export const EXPERIMENTS = [
@@ -92,12 +95,24 @@ export const EXPERIMENTS = [
     default: false,
   },
   {
+    id: "videoSongs",
+    label: "Video Songs",
+    description:
+      "Lets songs that Spotify plays as a music video get lyrics from every provider, and shows the video itself in Fullscreen and the larger view in place of the still picture. Spotify draws its video in the Now Playing sidebar, so that sidebar must be open and set to video (its Switch to video button) for the video to appear in the cover; the thumbnail shows otherwise. Takes effect from the next song. Disable to bring back the notice that video songs have no lyrics, and the thumbnail.",
+    default: true,
+  },  {
     id: "liveBackground",
     label: "Live Video Background",
     description:
       "Fills the background of Fullscreen and the larger view with the song's animated video (its Spotify Canvas, or Apple Music's animated cover if it has none), darkened and blurred behind the lyrics. Songs with neither keep the normal background. Works without the two animated cover experiments being on. Disable to go back to the normal background.",
     default: false,
     slider: { label: "Background Blur", description: "How much the video is blurred. 0 is sharp.", min: 0, max: 60, step: 1, default: 24, unit: "px" },
+    toggle: {
+      label: "Video Songs in the Background",
+      description:
+        "For songs Spotify plays as a music video: put the video itself in the background instead of in the cover. The cover then shows the song's normal cover, or its animated Canvas or Apple Music cover when it has one. (Spotify's video cannot be copied, so it can only be in one place at a time.) Needs Video Songs on.",
+      default: false,
+    },
   },
 ] as const satisfies readonly Experiment[];
 
@@ -124,6 +139,19 @@ const sliders = new Map(
     exp.slider ? [[exp.id, persistAtom<number>(`experimentValue:${exp.id}`, exp.slider.default)] as const] : []
   )
 );
+
+const toggles = new Map(
+  (EXPERIMENTS as readonly Experiment[]).flatMap((exp) =>
+    exp.toggle ? [[exp.id, persistAtom<boolean>(`experimentOption:${exp.id}`, exp.toggle.default)] as const] : []
+  )
+);
+
+/** The persisted on/off choice of an experiment that has a 	oggle. */
+export function $experimentToggle(id: ExperimentId): ReturnType<typeof persistAtom<boolean>> {
+  const store = toggles.get(id);
+  if (!store) throw new Error(`Experiment "${id}" has no toggle`);
+  return store;
+}
 
 /** The persisted number of an experiment that has a slider. */
 export function $experimentSlider(id: ExperimentId): ReturnType<typeof persistAtom<number>> {

@@ -3,6 +3,7 @@ import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import { PageContainer } from "../../components/Pages/PageView.ts";
 import { onExperimentChange, isExperimentEnabled } from "../experiments.ts";
 import { $isNowBarOpen } from "../uiState.ts";
+import { heldMode, onHeldChange } from "../VideoSongs.ts";
 import { dropVideo, getMotion, loopVideo, pauseOrResumeAll } from "./Motion.ts";
 import { initLiveBackground } from "./LiveBackground.ts";
 
@@ -30,7 +31,8 @@ export async function syncAnimatedCover(): Promise<void> {
   const container = PageContainer?.querySelector<HTMLElement>(CONTAINER);
   const use = { apple: isExperimentEnabled("animatedCover"), canvas: isExperimentEnabled("spotifyCanvas") };
 
-  if ((!use.apple && !use.canvas) || !container?.isConnected || !$isNowBarOpen.get()) {
+  // A video song shows its own video in the cover instead (see VideoSongs.ts), unless that is sent to the background.
+  if ((!use.apple && !use.canvas) || !container?.isConnected || !$isNowBarOpen.get() || heldMode() === "cover") {
     detach();
     return;
   }
@@ -67,6 +69,7 @@ export function initAnimatedCover(): void {
     Global.Event.listen(event, () => void syncAnimatedCover());
   }
   $isNowBarOpen.listen(() => void syncAnimatedCover());
+  onHeldChange(() => void syncAnimatedCover());
   onExperimentChange((experiment) => {
     if (experiment.id === "animatedCover" || experiment.id === "spotifyCanvas") void syncAnimatedCover();
   });

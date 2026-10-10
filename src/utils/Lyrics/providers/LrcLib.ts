@@ -39,6 +39,8 @@ function qs(params: Record<string, string | number | undefined>): string {
 async function findRecord(track: TrackInfo): Promise<LrcLibRecord | null> {
   const durationS = Math.round(track.durationMs / 1000);
 
+  // LRCLIB's /get is the one that is often overloaded (503) while /search still answers, so a
+  // failure here is not the end of the lookup; only if the search fails too is it reported.
   const exact = await getJson(
     `${BASE}/get?${qs({
       track_name: track.name,
@@ -46,7 +48,10 @@ async function findRecord(track: TrackInfo): Promise<LrcLibRecord | null> {
       album_name: track.album,
       duration: durationS || undefined,
     })}`
-  );
+  ).catch((error) => {
+    logger.debug("LRCLIB /get failed; trying /search", error);
+    return null;
+  });
   if (exact) return exact as LrcLibRecord;
 
   // /get is strict about the album and duration; fall back to a looser search.

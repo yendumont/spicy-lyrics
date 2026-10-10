@@ -1,7 +1,7 @@
 import Platform from "../../../components/Global/Platform.ts";
 import { Query } from "../../API/Query.ts";
 import { SLObjPack } from "../../objpack.ts";
-import { IsUnlistedItem, ResolveTrack, spotifyIdOf } from "./Resolve.ts";
+import { IsUnlistedItem, ResolveTrack, spicyIdForVideoSong, spotifyIdOf } from "./Resolve.ts";
 
 const packer = new SLObjPack();
 
@@ -14,6 +14,10 @@ export async function FetchSpicyFor(uri: string, isStale: () => boolean = () => 
   let id: string | null | undefined = uri.split(":")[2];
   if (IsUnlistedItem(uri)) {
     id = spotifyIdOf(await ResolveTrack(isStale));
+  } else {
+    // A video song is asked about as its audio track (see Resolve.ts).
+    const forVideo = await spicyIdForVideoSong();
+    if (forVideo !== undefined) id = forVideo;
   }
   if (!id) return null;
 

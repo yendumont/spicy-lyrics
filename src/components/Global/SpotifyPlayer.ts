@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createTooltip } from "../../utils/tooltip.ts";
+import { videoSongInBackground } from "../../utils/videoSongMode.ts";
 import Global from "./Global.ts";
 import GetProgress, {
   _DEPRECATED___GetProgress,
@@ -151,6 +152,19 @@ export const SpotifyPlayer = {
   GetCover: (size: CoverSizes): string | undefined => {
     const item = Spicetify?.Player?.data?.item;
     if (!item) return COVER_PLACEHOLDER_URL;
+    // A video song's own pictures are frames of the video. When its video goes in the background,
+    // the cover is the picture of the audio track it belongs to (a 300 px one at most for the
+    // smaller sizes, 640 px for the larger).
+    if (videoSongInBackground()) {
+      const meta = item.metadata as Record<string, string> | undefined;
+      const id =
+        size === "small"
+          ? meta?.audio_association_image_small
+          : size === "standard"
+            ? meta?.audio_association_image
+            : meta?.audio_association_image_large ?? meta?.audio_association_image;
+      if (id) return `spotify:image:${id}`;
+    }
     // @ts-ignore aaa
     const covers = item.images ?? item.show?.images;
     if (covers?.length > 0) {

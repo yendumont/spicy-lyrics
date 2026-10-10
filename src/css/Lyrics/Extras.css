@@ -222,3 +222,16 @@
 #SpicyLyricsPage .LiveBackgroundVideo.Ready {
   opacity: 1;
 }
+
+/* ── Video songs ────────────────────────────────────────────────────────────── */
+/* Spotify's own video is lifted into the cover box. The box takes the video's shape (16:9 for
+   most) so there are no black bars; the video itself is positioned by VideoSongs.ts. */
+#SpicyLyricsPage .ContentBox .NowBar .Header .MediaBox .MediaImageContainer.HasPlayerVideo {
+  height: auto;
+  aspect-ratio: var(--PlayerVideoAspect, 16 / 9);
+  align-self: center;
+}
+
+#SpicyLyricsPage .MediaImageContainer.HasPlayerVideo > video {
+  border-radius: inherit;
+}

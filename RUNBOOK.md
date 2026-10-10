@@ -312,6 +312,28 @@ Settings, Experiments (both off by default):
   underneath and shows for songs with no video. It tries both sources by itself, so it works
   without the two cover experiments being on. **Background Blur** (0 to 60 px, default 24)
   appears under it while it is on, and changes straight away.
+### Video songs (experiment, on by default)
+
+Settings, Experiments, **Video Songs**. Songs Spotify plays as a music video used to show
+"We currently don't have support for video lyrics". They now get lyrics from every provider
+like any song, and Spotify's actual video plays in the cover of Fullscreen and the larger
+view instead of its thumbnail (the box takes the video's 16:9 shape). Spotify draws that
+video in its Now Playing sidebar, so keep the sidebar open and on video (its **Switch to
+video** button); it moves into the cover while the song plays and back when the song or page
+changes. Video podcasts are still not supported. Turn the experiment off to restore the
+old notice and the thumbnail.
+
+A video song is a separate Spotify track from the song's audio. Spicy Lyrics is asked about
+the audio track Spotify pairs it with, and the other providers also try that track, but only
+when the video is within about 3.5 seconds of the audio's length: a longer music video (an
+intro, say) would otherwise get lyrics timed to the shorter song, running early. In that case
+Spicy Lyrics is skipped and the providers look for the video's own length (LRCLIB and Genius
+often still have it).
+
+With **Live Video Background** on, its extra switch **Video Songs in the Background** puts the
+video itself in the blurred background instead of the cover (Spotify's video cannot be in two
+places at once). The cover then shows the song's normal album cover, or its animated Canvas or
+Apple Music cover if it has one.
 ## Genius fallback (optional)
 
 Genius is a provider in the **Lyrics Provider Priority** list, last in the default order. With

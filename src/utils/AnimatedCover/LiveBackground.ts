@@ -1,7 +1,8 @@
 import Global from "../../components/Global/Global.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import { PageContainer } from "../../components/Pages/PageView.ts";
-import { $experimentSlider, isExperimentEnabled, onExperimentChange } from "../experiments.ts";
+import { $experimentSlider, $experimentToggle, isExperimentEnabled, onExperimentChange } from "../experiments.ts";
+import { heldMode, onHeldChange } from "../VideoSongs.ts";
 import { dropVideo, getMotion, loopVideo } from "./Motion.ts";
 
 /**
@@ -26,7 +27,8 @@ async function syncLiveBackground(): Promise<void> {
   const mine = ++generation;
   const content = PageContainer?.querySelector<HTMLElement>(CONTENT);
 
-  if (!isExperimentEnabled("liveBackground") || !content?.isConnected) {
+  // A video song's own video can be what fills the background (see VideoSongs.ts).
+  if (!isExperimentEnabled("liveBackground") || !content?.isConnected || heldMode() === "background") {
     detach();
     return;
   }
@@ -63,6 +65,8 @@ export function initLiveBackground(): void {
   const blur = $experimentSlider("liveBackground");
   applyBlur(blur.get());
   blur.listen(applyBlur);
+  onHeldChange(() => void syncLiveBackground());
+  $experimentToggle("liveBackground").listen(() => void syncLiveBackground());
 
   Global.Event.listen("playback:songchange", () => {
     detach();

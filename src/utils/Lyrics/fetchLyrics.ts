@@ -21,7 +21,7 @@ import { LyricsQueueRetry } from "./LyricsQueueRetry.ts";
 import { GetExpireStore } from "../../modules/Store.ts";
 import { SLObjPack } from "../objpack.ts";
 import { HideLyricsSkeleton, IsLyricsSkeletonEnabled, ShowLyricsSkeleton } from "./LyricsSkeleton.ts";
-import { onExperimentChange } from "../experiments.ts";
+import { isExperimentEnabled, onExperimentChange } from "../experiments.ts";
 import { BeginReport, RecordOutcome, RecordResult } from "./providers/LookupReport.ts";
 import { FetchFromSource, PickFor, PickKey, PickStore } from "./providers/Sources.ts";
 import {
@@ -30,6 +30,7 @@ import {
   GetProviderOrder,
   IsUnlistedItem,
   ResolveTrack,
+  spicyIdForVideoSong,
   spotifyIdOf,
   activeProviders,
   resolveOrder,
@@ -178,9 +179,13 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
 
   const mediaType = SpotifyPlayer.GetMediaType();
 
+  // A song Spotify plays as a music video is still a song with lyrics (experiment); a video
+  // podcast is not.
+  const isVideoSong = mediaType === "video" && isExperimentEnabled("videoSongs");
   if (
     mediaType &&
-    mediaType !== "audio"
+    mediaType !== "audio" &&
+    !isVideoSong
   ) {
     $currentlyFetching.set(false);
     if (mediaType === "video") {
@@ -511,6 +516,14 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
         return await finish();
       }
       queryId = matched;
+    } else {
+      // A video song is asked about as its audio track, when that fits it (see Resolve.ts).
+      const forVideo = await spicyIdForVideoSong();
+      if (forVideo === null) {
+        RecordOutcome(uri, "spicy", { state: "notfound" });
+        return await finish();
+      }
+      if (forVideo) queryId = forVideo;
     }
 
     const runLyricsQuery = async (token: string) => {

@@ -103,25 +103,49 @@ function parseKrc(krc: string): any | null {
 
     const body = line.slice(head[0].length);
     const marks = [...body.matchAll(/<(\d+),(\d+),-?\d+>/g)];
-    const words = marks
-      .map((m, i) => {
-        const from = (m.index ?? 0) + m[0].length;
-        const to = marks[i + 1]?.index ?? body.length;
-        return { text: body.slice(from, to), start: lineStart + Number(m[1]), duration: Number(m[2]) };
-      })
-      .filter((w) => w.text.trim() !== "");
+    const tokens = marks.map((m, i) => {
+      const from = (m.index ?? 0) + m[0].length;
+      const to = marks[i + 1]?.index ?? body.length;
+      return { text: body.slice(from, to), start: lineStart + Number(m[1]), duration: Number(m[2]) };
+    });
+
+    // A space is often a token of its own (`<80,0,0> `), so it is read here, as a gap after
+    // the word before it, instead of being dropped with the empty tokens.
+    type Word = { text: string; start: number; duration: number; spaceAfter: boolean };
+    const words: Word[] = [];
+    let spaceBefore = false;
+    for (const token of tokens) {
+      if (token.text.trim() === "") {
+        if (words.length > 0) words[words.length - 1].spaceAfter = true;
+        spaceBefore = true;
+        continue;
+      }
+      const lead = /^\s/.test(token.text);
+      const prev = words[words.length - 1];
+      // A mark of punctuation with no time of its own belongs to the word it follows.
+      if (prev && token.duration === 0 && !lead && !spaceBefore && /^[\p{P}\p{S}]+\s*$/u.test(token.text)) {
+        prev.text += token.text.trim();
+        prev.spaceAfter = /\s$/.test(token.text);
+        continue;
+      }
+      if (prev && lead) prev.spaceAfter = true;
+      words.push({
+        text: token.text.trim(),
+        start: token.start,
+        duration: token.duration,
+        spaceAfter: /\s$/.test(token.text),
+      });
+      spaceBefore = false;
+    }
     if (words.length === 0) continue;
     if (isCreditLine(words.map((w) => w.text).join(""))) continue;
 
-    const syllables = words.map((w, i) => {
-      const next = words[i + 1];
-      return {
-        Text: w.text.trim(),
-        IsPartOfWord: next !== undefined && !/\s$/.test(w.text) && !/^\s/.test(next.text),
-        StartTime: w.start / 1000,
-        EndTime: (w.start + w.duration) / 1000,
-      };
-    });
+    const syllables = words.map((w, i) => ({
+      Text: w.text,
+      IsPartOfWord: i < words.length - 1 && !w.spaceAfter,
+      StartTime: w.start / 1000,
+      EndTime: (w.start + w.duration) / 1000,
+    }));
 
     content.push({
       Type: "Vocal",

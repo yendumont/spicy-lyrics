@@ -1,7 +1,7 @@
 # Runbook: running this fork next to (or instead of) official Spicy Lyrics
 
-This fork adds six lyrics providers (**lrc.red**, **LRCLIB**, **Unison**, **LRCMux**, **NetEase**, **QQ Music**) plus Genius, an adjustable provider priority list, provider fallback and a
-"Prefer Best Sync" mode. It installs into Spicetify as its **own extension**,
+This fork adds about 15 lyrics providers (lrc.red, LRCLIB, Unison, LRCMux, NetEase, QQ Music, Genius, Musixmatch, AMLL TTML DB, KuGou, Deezer, Kuwo, YouTube Music, BiniLyrics), an adjustable provider priority list,
+provider fallback and a "Prefer Best Sync" mode, plus line meanings, Gemini translation, TTML export, animated covers and Canvas, and lyrics for local files and podcasts. Each feature has its own section below. It installs into Spicetify as its **own extension**,
 `spicy-lyrics-providers.js`, so official Spicy Lyrics updates cannot overwrite it.
 
 ## Why it is separate

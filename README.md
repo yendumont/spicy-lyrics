@@ -1,3 +1,28 @@
+# Spicy Lyrics (fork)
+
+> [!IMPORTANT]
+> **This is an unofficial fork** of [Spikerko/spicy-lyrics](https://github.com/Spikerko/spicy-lyrics). It is not made or supported by the Spicy Lyrics team. This section is about the fork; the original project's README follows the line below.
+
+**What it adds:** about 15 lyrics sources with a priority list and per-song pinning, Genius line meanings, Gemini translation (including word-synced translation), TTML export, animated album covers, Spotify Canvas and a live video background, and lyrics for local files and podcasts. The full list is in [RUNBOOK.md](./RUNBOOK.md).
+
+**Installing the fork** (Windows; the macOS and Linux scripts are untested):
+
+1. Install [Spicetify](https://spicetify.app) and [Bun](https://bun.sh), and apply Spicetify to Spotify once (`spicetify backup apply`).
+2. Remove the official Spicy Lyrics from Spicetify (Marketplace uninstall). **Never run both**: they use the same page and settings.
+3. Clone this repo, then from its folder in PowerShell run:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\install-spicetify.ps1
+   ```
+
+   This builds the extension, installs it as `spicy-lyrics-providers.js` and restarts Spotify.
+
+To update, run `scripts\update-fork.ps1`. For macOS and Linux, the Worker setup that Genius and YouTube Music need, settings, and troubleshooting, read [RUNBOOK.md](./RUNBOOK.md).
+
+---
+
+## Original project README
+
 # Spicy Lyrics
 [![Github Version](https://img.shields.io/github/v/release/spikerko/spicy-lyrics)](https://github.com/spikerko/spicy-lyrics/) [![Github Stars badge](https://img.shields.io/github/stars/spikerko/spicy-lyrics?style=social)](https://github.com/spikerko/spicy-lyrics/) [![Discord Badge](https://dcbadge.limes.pink/api/server/uqgXU5wh8j?style=flat)](https://discord.com/invite/uqgXU5wh8j)
 

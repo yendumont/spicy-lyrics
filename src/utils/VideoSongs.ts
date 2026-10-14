@@ -2,7 +2,7 @@ import Global from "../components/Global/Global.ts";
 import { PageContainer } from "../components/Pages/PageView.ts";
 import { $experimentToggle, onExperimentChange } from "./experiments.ts";
 import { isVideoSongItem, videoSongInBackground } from "./videoSongMode.ts";
-import { $isNowBarOpen } from "./uiState.ts";
+import { nowBarShown, onNowBarShownChange } from "./nowBarShown.ts";
 
 /**
  * Video songs (tracks Spotify plays as a music video).
@@ -141,7 +141,7 @@ function sync(): void {
       ? PageContainer?.querySelector<HTMLElement>(CONTENT)
       : PageContainer?.querySelector<HTMLElement>(COVER);
   // The cover is only there while the Now Bar is open; the background is there while the page is.
-  const wanted = !!mode && !!target?.isConnected && (mode === "background" || $isNowBarOpen.get());
+  const wanted = !!mode && !!target?.isConnected && (mode === "background" || nowBarShown());
 
   if (!wanted || !mode || !target) {
     release();
@@ -174,7 +174,7 @@ export function initVideoSongs(): void {
   for (const event of ["fullscreen:open", "fullscreen:exit", "page:open"]) {
     Global.Event.listen(event, sync);
   }
-  $isNowBarOpen.listen(sync);
+  onNowBarShownChange(sync);
   onExperimentChange((experiment) => {
     if (experiment.id === "videoSongs" || experiment.id === "liveBackground") sync();
   });

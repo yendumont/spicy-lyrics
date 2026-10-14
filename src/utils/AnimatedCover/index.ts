@@ -2,7 +2,7 @@ import Global from "../../components/Global/Global.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import { PageContainer } from "../../components/Pages/PageView.ts";
 import { onExperimentChange, isExperimentEnabled } from "../experiments.ts";
-import { $isNowBarOpen } from "../uiState.ts";
+import { nowBarShown, onNowBarShownChange } from "../nowBarShown.ts";
 import { heldMode, onHeldChange } from "../VideoSongs.ts";
 import { dropVideo, getMotion, loopVideo, pauseOrResumeAll } from "./Motion.ts";
 import { initLiveBackground } from "./LiveBackground.ts";
@@ -32,7 +32,7 @@ export async function syncAnimatedCover(): Promise<void> {
   const use = { apple: isExperimentEnabled("animatedCover"), canvas: isExperimentEnabled("spotifyCanvas") };
 
   // A video song shows its own video in the cover instead (see VideoSongs.ts), unless that is sent to the background.
-  if ((!use.apple && !use.canvas) || !container?.isConnected || !$isNowBarOpen.get() || heldMode() === "cover") {
+  if ((!use.apple && !use.canvas) || !container?.isConnected || !nowBarShown() || heldMode() === "cover") {
     detach();
     return;
   }
@@ -69,7 +69,7 @@ export function initAnimatedCover(): void {
   for (const event of ["fullscreen:open", "fullscreen:exit", "page:open", "page:destroy"]) {
     Global.Event.listen(event, () => void syncAnimatedCover());
   }
-  $isNowBarOpen.listen(() => void syncAnimatedCover());
+  onNowBarShownChange(() => void syncAnimatedCover());
   onHeldChange(() => void syncAnimatedCover());
   onExperimentChange((experiment) => {
     if (experiment.id === "animatedCover" || experiment.id === "spotifyCanvas") void syncAnimatedCover();

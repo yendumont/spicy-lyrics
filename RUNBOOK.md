@@ -1,7 +1,7 @@
 # Runbook: running this fork next to (or instead of) official Spicy Lyrics
 
 This fork adds about 15 lyrics providers (lrc.red, LRCLIB, Unison, LRCMux, NetEase, QQ Music, Genius, Musixmatch, AMLL TTML DB, KuGou, Deezer, Kuwo, YouTube Music, BiniLyrics), an adjustable provider priority list,
-provider fallback and a "Prefer Best Sync" mode, plus line meanings, Gemini translation, TTML export, animated covers and Canvas, and lyrics for local files and podcasts. Each feature has its own section below. It installs into Spicetify as its **own extension**,
+provider fallback and a "Prefer Best Sync" mode, plus line meanings, Gemini translation, animated covers and Canvas, and lyrics for local files and podcasts. Each feature has its own section below. It installs into Spicetify as its **own extension**,
 `spicy-lyrics-providers.js`, so official Spicy Lyrics updates cannot overwrite it.
 
 ## Why it is separate
@@ -456,6 +456,16 @@ special handling for either.
 Plain podcast episodes with no song in the title find nothing (they match nothing in the
 catalogue and give no artist to guess). Video podcasts remain
 unsupported. Takes effect from the next song. Cached under a key made from the whole uri.
+
+## Releases and keeping up with upstream
+
+**Making a release (no tools needed on your PC):** on GitHub open the repo, **Releases**, **Draft a new release**, pick or type a tag such as `v1.0.1`, write a few lines of notes and **Publish**. A workflow (`.github/workflows/release.yml`) then builds the extension on GitHub and attaches `spicy-lyrics-providers.js` to the release in about a minute. To test the build without a release, open the **Actions** tab, choose **Build release file** and **Run workflow**; the file is kept on the run page for a week. If a run fails, its log shows the step that broke.
+
+**Releases and upstream are separate.** A release only publishes what is in your repo as it is. You do not have to sync with Spicy Lyrics before each one.
+
+**Keeping up with upstream (do it now and then, not every release):** the official extension updates itself from its CDN, but this fork is a snapshot, so it only changes when you merge. Do it when Spicy Lyrics releases something, or when lyrics from the official service stop loading (the service may start refusing an old version). Run `scripts\update-fork.ps1` (see Updating above), check Spotify, then commit, push and publish a new release. If the merge conflicts, see "If the merge conflicts" above; the likeliest file is `src/utils/Lyrics/fetchLyrics.ts`.
+
+**What can still break without any change from you:** the unofficial lyrics sources (NetEase, QQ Music, KuGou, Kuwo, Deezer and similar) change their endpoints from time to time, and a Spotify or Spicetify update can change what an extension may rely on. A source that stops answering shows "Failed" or "Not found" in Settings, Lyrics Sources, and needs a code fix in its file under `src/utils/Lyrics/providers/`.
 
 ## Rollback / uninstall
 

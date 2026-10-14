@@ -1,0 +1,44 @@
+name: Build release file
+
+# Publishing a release on GitHub builds the extension and attaches it as
+# spicy-lyrics-providers.js. "Run workflow" (Actions tab) builds one without a release and
+# keeps it as a download on the run page for a week.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install packages
+        run: bun install
+
+      # GitHub sets CI=true, which makes the build skip Spicetify and write to ./dist.
+      - name: Build
+        run: bun run build
+
+      - name: Name the file
+        run: cp dist/spicy-lyrics.js spicy-lyrics-providers.js
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" spicy-lyrics-providers.js --clobber
+
+      - name: Keep as a download (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: spicy-lyrics-providers
+          path: spicy-lyrics-providers.js
+          retention-days: 7

@@ -1,7 +1,6 @@
 import { useStore } from "@nanostores/react";
 import React from "react";
 import { SpotifyPlayer } from "../../../components/Global/SpotifyPlayer.ts";
-import { ExportCurrentLyricsAsTTML, type ExportFormat } from "../../../utils/LyricsExport.ts";
 import { $lookupReport } from "../../../utils/Lyrics/providers/LookupReport.ts";
 import { PROVIDER_LABELS, resolveOrder } from "../../../utils/Lyrics/providers/ProviderOrder.ts";
 import { CheckAllSources } from "../../../utils/Lyrics/providers/Sources.ts";
@@ -16,16 +15,12 @@ import {
   $lyricsProvidersDisabled,
 } from "../../../utils/stores.ts";
 import type { LyricsProviderId } from "../../../utils/Lyrics/providers/types.ts";
-import { matches, Row, Select, SectionTitle } from "./components.tsx";
+import { matches, Row, SectionTitle } from "./components.tsx";
 
 const SECTION_NAME = "Lyrics Sources";
 const LABEL = "Sources for This Song";
 const DESCRIPTION =
   "Which lyrics sources have this song, and a way to pick one for it. Songs are normally looked up in your priority order and stop at the first good result; Check All Sources asks every source.";
-
-const EXPORT_LABEL = "Export Lyrics as TTML";
-const EXPORT_DESCRIPTION =
-  "Save the playing song's lyrics as a .ttml file, from whichever source is showing, or use a source's Export button above. Word-synced lyrics keep word timing, background vocals and the two singer sides. Pick Line-synced or Unsynced to save a simpler file; sync can be reduced but not added.";
 
 export default function SourcesSection({ query, sectionFilter }: { query: string; sectionFilter: string }) {
   const report = useStore($lookupReport);
@@ -34,14 +29,9 @@ export default function SourcesSection({ query, sectionFilter }: { query: string
   const legacy = useStore($lyricsProvider);
   const disabled = useStore($lyricsProvidersDisabled);
   const [checking, setChecking] = React.useState(false);
-  const [format, setFormat] = React.useState<ExportFormat>("original");
 
   if (sectionFilter !== "All" && sectionFilter !== SECTION_NAME) return null;
-  if (
-    !matches(query, LABEL, DESCRIPTION) &&
-    !matches(query, "Chosen Source", "pin a lyrics source to a song") &&
-    !matches(query, EXPORT_LABEL, EXPORT_DESCRIPTION)
-  ) {
+  if (!matches(query, LABEL, DESCRIPTION) && !matches(query, "Chosen Source", "pin a lyrics source to a song")) {
     return null;
   }
 
@@ -114,14 +104,6 @@ export default function SourcesSection({ query, sectionFilter }: { query: string
                     Use
                   </button>
                 )}
-                <button
-                  className="sl-sp-provider-btn"
-                  disabled={off || !uri || !status.found}
-                  onClick={() => ExportCurrentLyricsAsTTML({ source: id, format })}
-                  title={`Save ${PROVIDER_LABELS[id]}'s lyrics for this song as a .ttml file`}
-                >
-                  Export
-                </button>
               </div>
             );
           })}
@@ -150,20 +132,6 @@ export default function SourcesSection({ query, sectionFilter }: { query: string
           Clear
         </button>
       </Row>
-
-      {matches(query, EXPORT_LABEL, EXPORT_DESCRIPTION) && (
-        <Row label={EXPORT_LABEL} description={EXPORT_DESCRIPTION}>
-          <Select
-            value={format}
-            options={["original", "Syllable", "Line", "Static"]}
-            labels={["As they are", "Word-synced", "Line-synced", "Unsynced"]}
-            onChange={(v) => setFormat(v as ExportFormat)}
-          />
-          <button className="sl-sp-btn" disabled={!uri} onClick={() => ExportCurrentLyricsAsTTML({ format })}>
-            Export
-          </button>
-        </Row>
-      )}
     </>
   );
 }

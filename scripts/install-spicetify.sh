@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds this fork of Spicy Lyrics and installs it into Spicetify as its own extension,
-# "spicy-lyrics-providers.js". macOS and Linux twin of install-spicetify.ps1; see RUNBOOK.md.
+# "spicy-lyrics-hype.providers.js". macOS and Linux twin of install-spicetify.ps1; see RUNBOOK.md.
 #
 # Steps: bun install -> bun run build -> rename the output -> register it in Spicetify ->
 # spicetify apply (restarts Spotify).
@@ -12,7 +12,9 @@
 
 set -euo pipefail
 
-EXT_NAME="spicy-lyrics-providers.js"
+EXT_NAME="spicy-lyrics-hype.providers.js"
+# The name the first release used. It is removed on install so it never loads beside this one.
+OLD_EXT_NAME="spicy-lyrics-providers.js"
 # What spicetify-creator calls the file it builds (from "name" in spice.config.ts).
 BUILT_NAME="spicy-lyrics.js"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -63,6 +65,7 @@ if [ -z "$USER_DATA" ] || [ ! -d "$USER_DATA" ]; then
 fi
 EXT_DIR="$USER_DATA/Extensions"
 TARGET="$EXT_DIR/$EXT_NAME"
+OLD_TARGET="$EXT_DIR/$OLD_EXT_NAME"
 
 # Spicetify: `config extensions X` adds X, `config extensions X-` removes it.
 set_registered() {
@@ -77,6 +80,8 @@ if [ "$UNINSTALL" = "1" ]; then
   echo "Removing $EXT_NAME from Spicetify..."
   set_registered "$EXT_NAME" 0
   rm -f "$TARGET"
+  set_registered "$OLD_EXT_NAME" 0
+  rm -f "$OLD_TARGET"
   if [ "$NO_APPLY" = "0" ]; then "$SPICETIFY" apply; fi
   echo "Uninstalled."
   exit 0
@@ -120,6 +125,9 @@ set_registered "$EXT_NAME" 1
 # Leftovers from `bun run dev` / a plain build; this fork loads under its own name.
 set_registered "sc-live-reload-helper.js" 0
 set_registered "$BUILT_NAME" 0
+# Left registered, the first release's file would load beside this one and the two would clash.
+set_registered "$OLD_EXT_NAME" 0
+rm -f "$OLD_TARGET"
 
 if [ "$NO_APPLY" = "1" ]; then
   echo 'Done. Run `spicetify apply` when you are ready to load it.'

@@ -2,13 +2,13 @@
 
 This fork adds about 15 lyrics providers (lrc.red, LRCLIB, Unison, LRCMux, NetEase, QQ Music, Genius, Musixmatch, AMLL TTML DB, KuGou, Deezer, Kuwo, YouTube Music, BiniLyrics), an adjustable provider priority list,
 provider fallback and a "Prefer Best Sync" mode, plus line meanings, Gemini translation, animated covers and Canvas, and lyrics for local files and podcasts. Each feature has its own section below. It installs into Spicetify as its **own extension**,
-`spicy-lyrics-providers.js`, so official Spicy Lyrics updates cannot overwrite it.
+`spicy-lyrics-hype.providers.js`, so official Spicy Lyrics updates cannot overwrite it.
 
 ## Why it is separate
 
 | | Official Spicy Lyrics | This fork |
 |---|---|---|
-| Spicetify file | `spicy-lyrics.mjs` (a ~100 byte loader) | `spicy-lyrics-providers.js` (full 1.4 MB build) |
+| Spicetify file | `spicy-lyrics.mjs` (a ~100 byte loader) | `spicy-lyrics-hype.providers.js` (full 1.4 MB build) |
 | Where the code lives | Downloaded from a CDN on every start, so upstream updates reach you instantly | Inside the file. Changes only when you rebuild |
 | Updates | Automatic | Manual: `scripts/update-fork.ps1` |
 
@@ -43,7 +43,7 @@ Run all scripts from a PowerShell prompt at the repo root.
    ```
 
    It runs `bun install`, `bun run build`, renames the output to
-   `spicy-lyrics-providers.js`, registers it, and runs `spicetify apply`
+   `spicy-lyrics-hype.providers.js`, registers it, and runs `spicetify apply`
    (**Spotify restarts**).
 
 Flags: `-SkipInstall` (skip `bun install`), `-NoApply` (do not restart Spotify; run
@@ -112,8 +112,8 @@ By hand, if you prefer:
 ```bash
 bun install && bun run build            # writes spicy-lyrics.js into Spicetify's Extensions folder
 EXT="$(spicetify path userdata)/Extensions"
-mv "$EXT/spicy-lyrics.js" "$EXT/spicy-lyrics-providers.js"
-spicetify config extensions spicy-lyrics-providers.js
+mv "$EXT/spicy-lyrics.js" "$EXT/spicy-lyrics-hype.providers.js"
+spicetify config extensions spicy-lyrics-hype.providers.js
 spicetify config extensions spicy-lyrics.js-       # drop the plain build, if registered
 spicetify apply
 ```
@@ -123,7 +123,7 @@ Testing against the real client: quit Spotify, start it with
 `bun scripts/dev/cdp.ts <file.js>` (see `FORK_NOTES.md`).
 ## Verify
 
-1. `spicetify config extensions` lists `spicy-lyrics-providers.js` and not
+1. `spicetify config extensions` lists `spicy-lyrics-hype.providers.js` and not
    `spicy-lyrics.mjs`.
 2. In Spotify, open Spicy Lyrics, then Settings, Lyrics Display. You should see
    **Lyrics Provider Priority**, **Provider Fallback** and **Prefer Best Sync**.
@@ -459,7 +459,7 @@ unsupported. Takes effect from the next song. Cached under a key made from the w
 
 ## Releases and keeping up with upstream
 
-**Making a release (no tools needed on your PC):** on GitHub open the repo, **Releases**, **Draft a new release**, pick or type a tag such as `v1.0.1`, write a few lines of notes and **Publish**. A workflow (`.github/workflows/release.yml`) then builds the extension on GitHub and attaches `spicy-lyrics-providers.js` to the release in about a minute. To test the build without a release, open the **Actions** tab, choose **Build release file** and **Run workflow**; the file is kept on the run page for a week. If a run fails, its log shows the step that broke.
+**Making a release (no tools needed on your PC):** on GitHub open the repo, **Releases**, **Draft a new release**, pick or type a tag such as `v1.0.1`, write a few lines of notes and **Publish**. A workflow (`.github/workflows/release.yml`) then builds the extension on GitHub and attaches `spicy-lyrics-hype.providers.js` to the release in about a minute. To test the build without a release, open the **Actions** tab, choose **Build release file** and **Run workflow**; the file is kept on the run page for a week. If a run fails, its log shows the step that broke.
 
 **Releases and upstream are separate.** A release only publishes what is in your repo as it is. You do not have to sync with Spicy Lyrics before each one.
 

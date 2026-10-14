@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   Builds this fork of Spicy Lyrics and installs it into Spicetify as its own
-  extension, "spicy-lyrics-providers.js".
+  extension, "spicy-lyrics-hype.providers.js".
 
 .DESCRIPTION
   The official Spicy Lyrics install is a tiny loader that pulls its code from a CDN,
@@ -29,7 +29,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$ExtName = 'spicy-lyrics-providers.js'
+$ExtName = 'spicy-lyrics-hype.providers.js'
+# The name the first release used. It is removed on install so it never loads beside this one.
+$OldExtName = 'spicy-lyrics-providers.js'
 # What spicetify-creator calls the file it builds (from "name" in spice.config.ts).
 $BuiltName = 'spicy-lyrics.js'
 $Repo = Split-Path -Parent $PSScriptRoot
@@ -56,6 +58,7 @@ $userData = (& $spicetify path userdata | Select-Object -First 1).Trim()
 if (-not $userData -or -not (Test-Path $userData)) { $userData = Join-Path $env:APPDATA 'spicetify' }
 $extDir = Join-Path $userData 'Extensions'
 $target = Join-Path $extDir $ExtName
+$oldTarget = Join-Path $extDir $OldExtName
 
 function Set-ExtensionRegistered([string]$Name, [bool]$Registered) {
   # Spicetify: `config extensions X` adds X, `config extensions X-` removes it.
@@ -67,6 +70,8 @@ if ($Uninstall) {
   Write-Host "Removing $ExtName from Spicetify..."
   Set-ExtensionRegistered $ExtName $false
   if (Test-Path $target) { Remove-Item $target -Force }
+  Set-ExtensionRegistered $OldExtName $false
+  if (Test-Path $oldTarget) { Remove-Item $oldTarget -Force }
   if (-not $NoApply) { Invoke-Native $spicetify @('apply') }
   Write-Host 'Uninstalled.'
   return
@@ -112,6 +117,9 @@ Set-ExtensionRegistered $ExtName $true
 # Leftovers from `bun run dev` / a plain build; this fork loads under its own name.
 Set-ExtensionRegistered 'sc-live-reload-helper.js' $false
 Set-ExtensionRegistered $BuiltName $false
+# Left registered, the first release's file would load beside this one and the two would clash.
+Set-ExtensionRegistered $OldExtName $false
+if (Test-Path $oldTarget) { Remove-Item $oldTarget -Force }
 
 if ($NoApply) {
   Write-Host 'Done. Run `spicetify apply` when you are ready to load it.'

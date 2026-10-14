@@ -1,4 +1,4 @@
-# Spicy Lyrics (fork)
+# SpicyLyrics (#Hype)
 
 > [!IMPORTANT]
 > **This is an unofficial fork** of [Spikerko/spicy-lyrics](https://github.com/Spikerko/spicy-lyrics). It is not made or supported by the Spicy Lyrics team. This section is about the fork; the original project's README follows the line below.
@@ -11,16 +11,18 @@ You need [Spicetify](https://spicetify.app) set up on your Spotify desktop app (
 
 ### Option 1: download the file (easiest)
 
-1. Download `spicy-lyrics-providers.js` from the [latest release](../../releases/latest).
+1. Download `spicy-lyrics-hype.providers.js` from the [latest release](../../releases/latest).
 2. Put it in Spicetify's `Extensions` folder. Run `spicetify path userdata` to find the folder that holds it (on Windows that is `%APPDATA%\spicetify`).
 3. Run these two commands. Spotify restarts:
 
    ```bash
-   spicetify config extensions spicy-lyrics-providers.js
+   spicetify config extensions spicy-lyrics-hype.providers.js
    spicetify apply
    ```
 
 To update, download the new file from the latest release over the old one and run `spicetify apply` again.
+
+**Coming from v1.0.0?** That release used the file name `spicy-lyrics-providers.js`. Remove it first, or both will load and clash: delete that file from the `Extensions` folder and run `spicetify config extensions spicy-lyrics-providers.js-` (note the `-` at the end) before the steps above. Building it yourself (Option 2) does this for you.
 
 ### Option 2: build it yourself
 
@@ -30,7 +32,7 @@ Install [Bun](https://bun.sh) and git, clone this repo, then from its folder in 
 powershell -ExecutionPolicy Bypass -File scripts\install-spicetify.ps1
 ```
 
-This builds the extension, installs it as `spicy-lyrics-providers.js` and restarts Spotify. To update, run `scripts\update-fork.ps1`.
+This builds the extension, installs it as `spicy-lyrics-hype.providers.js` and restarts Spotify. To update, run `scripts\update-fork.ps1`.
 
 For the Worker setup that Genius and YouTube Music need, macOS and Linux, settings, and troubleshooting, read [RUNBOOK.md](./RUNBOOK.md).
 

@@ -8,7 +8,7 @@ upstream `Spikerko/spicy-lyrics`). `RUNBOOK.md` covers install/update/troublesho
 
 A **Spicetify extension** that runs inside the Spotify desktop client (CEF Chromium). It depends on
 `window.Spicetify.*` at runtime. It is not a web app. Built with bun + `@spicemod/creator`
-(`spice.config.ts`), installed as its **own** extension `spicy-lyrics-providers.js` so official Spicy Lyrics
+(`spice.config.ts`), installed as its **own** extension `spicy-lyrics-hype.providers.js` so official Spicy Lyrics
 updates can't overwrite it. Never enable it alongside the official `spicy-lyrics.mjs` (same page route,
 same `SL:settings` key).
 

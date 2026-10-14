@@ -17,6 +17,7 @@ import { ProcessLyrics } from "./ProcessLyrics.ts";
 import { IsEmptyLyrics } from "./EmptyLines.ts";
 import Logger from "../Logger.ts";
 import { LocalLyricsManager } from "./manager/index.ts";
+import { embeddedLyricsForUri } from "../LocalEmbed/Library.ts";
 import { LyricsQueueRetry } from "./LyricsQueueRetry.ts";
 import { GetExpireStore } from "../../modules/Store.ts";
 import { SLObjPack } from "../objpack.ts";
@@ -296,6 +297,19 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
       return [{ ...pinned, fromCache: true }, 200];
     }
     lyricsLogger.warn("The pinned source has no lyrics for this song; using the automatic order");
+  }
+
+  // A local file's own lyrics (experiment): read from its tags earlier, matched by artist and
+  // title, and shown as synced as the tags are. Ahead of any lookup, since they are the song's own.
+  if (uri.startsWith("spotify:local:") && isExperimentEnabled("embeddedLocalLyrics")) {
+    const embedded = await embeddedLyricsForUri(uri);
+    if (embedded) {
+      const lyricsData = { ...embedded, uri };
+      if (isStaleFetch(uri)) return [lyricsData, 200];
+      $currentLyricsData.set(JSON.stringify(lyricsData));
+      presentLyrics(lyricsData);
+      return [lyricsData, 200];
+    }
   }
 
   // Local files have no real track id (uri.split(":")[2] is the URL-encoded

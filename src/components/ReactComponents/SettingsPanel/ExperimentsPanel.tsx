@@ -7,6 +7,7 @@ import {
   type Experiment,
   type RegisteredExperiment,
 } from "../../../utils/experiments.ts";
+import { EmbeddedLyricsTool, TtmlToLrcTool } from "./LocalLyricsTools.tsx";
 import { Row, Slider, Toggle } from "./components.tsx";
 
 /**
@@ -55,6 +56,7 @@ function ExperimentRow({ experiment }: { experiment: RegisteredExperiment }) {
 
   const slider = (experiment as Experiment).slider;
   const toggle = (experiment as Experiment).toggle;
+  const tool = (experiment as Experiment).tool;
 
   return (
     <>
@@ -64,6 +66,8 @@ function ExperimentRow({ experiment }: { experiment: RegisteredExperiment }) {
       {/* The setting an experiment brings with it, only while it is on. */}
       {slider && enabled && <ExperimentSlider id={experiment.id} slider={slider} />}
       {toggle && enabled && <ExperimentToggle id={experiment.id} toggle={toggle} />}
+      {tool === "embeddedLyrics" && enabled && <EmbeddedLyricsTool />}
+      {tool === "ttmlToLrc" && enabled && <TtmlToLrcTool />}
     </>
   );
 }

@@ -18,6 +18,8 @@ The fork adds, on top of upstream:
 - Show-first-then-upgrade search (the first lyrics found are shown at once, better-synced ones replace them).
 - A **Lyrics Sources** settings panel: per-provider status, "Check All Sources", per-song pin, "Clear Chosen Source".
 - Experiment **Lyrics for Local Files & Podcasts** (`unlistedLyrics`).
+- Experiment **Embedded Lyrics for Local Files** (`embeddedLocalLyrics`): lyrics in a local file's tags (ID3 USLT/SYLT/TXXX, Vorbis comments, MP4 `©lyr`) shown word/line/unsynced by what they hold. The page cannot open files, so the listener picks a folder once (`<input type=file>`); tags are read in the page and kept in Cache Storage `SpicyLyrics_EmbeddedLyrics_g1`, matched by artist+title from the `spotify:local:` uri. Hooked in `fetchLyrics.ts` before the `local-track` bail-out. Code in `utils/LocalEmbed/`. Verified in Spotify with real local FLAC and MP3 files; a local track only starts through `PlayerAPI.play({uri:"spotify:local-files"}, ..., {skipTo})`.
+- Experiment **TTML to Enhanced LRC Converter** (`ttmlToLrc`): `utils/LocalEmbed/TtmlToLrc.ts`, panel in `LocalLyricsTools.tsx`.
 - Experiment **Word-Synced Translation** (`syncedTranslation`): on word-synced songs the translation is chunked by Gemini against the numbered sung words and lit word by word (`Extras/TranslationSyncDriver.ts`, driven from `Animate()`). Verified on Blinding Lights to Spanish; the same Translation.ts cache holds it (JSON chunk strings, key prefixed with a `§`-tagged word list).
 - **Line meanings** from Genius annotations (setting `lineMeaningsFrom`: artist / artist+editors / everyone).
 - **Gemini translation** with the user's own key (`geminiApiKey`, `translateLyrics`, `translationLanguage`).

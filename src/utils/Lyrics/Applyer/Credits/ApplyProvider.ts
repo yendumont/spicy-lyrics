@@ -10,6 +10,7 @@ const ProviderMap: [string, string][] = (
     ["aml", "Apple Music"],
     ["spl", "Spicy Lyrics"],
     ["ldb", "Local DB"],
+    ["embedded", "the song's own tags"],
     ...Object.values(PROVIDER_META).map((meta): [string, string] => [meta.creditKey, meta.label]),
   ] as [string, string][]
 ).sort((a, b) => b[0].length - a[0].length);

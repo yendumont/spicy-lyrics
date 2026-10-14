@@ -412,6 +412,26 @@ Check the Worker in a browser: `https://<your-worker>/search?q=hello` should ret
 If it returns an error such as `genius responded 403`, Genius is blocking Cloudflare's
 servers and the fallback will not work; clear the setting.
 
+## Embedded lyrics for local files, and the TTML converter (experiments)
+
+Two experiments in Settings, Experiments. Both are off by default.
+
+**Embedded Lyrics for Local Files.** Many music files carry lyrics in their tags. With this on, a local song that has them shows those lyrics when it plays, as synced as they are:
+
+| What is in the tag | How it is shown |
+|---|---|
+| enhanced LRC, `[00:12.00]<00:12.00>Hel<00:12.40>lo <00:12.90>world<00:13.50>` | word by word |
+| LRC, `[00:12.00]Hello world` (or an ID3 SYLT frame) | line by line |
+| a whole TTML document (`<tt …>`), as some tools embed | read as TTML: word, line or unsynced as it is timed, no conversion needed |
+| anything else | unsynced |
+
+- **Choosing your music once.** Spotify's page cannot open a local file by itself, so the experiment has a **Your music** row: **Choose folder…** or **Choose files…**. Only the tags are read, on your PC, and the lyrics are kept in the browser's cache (nothing is uploaded). Reading again adds to what is kept; **Clear** forgets it. After adding files, play the song again to pick up its lyrics.
+- **How a song is matched.** By the artist and title Spotify shows for the local file, which come from the same tags, so tag your files before choosing them. Several artists ("A; B", "A, B", "A feat. B") are matched by each name. If the album is in the tags too, it settles a tie between two files with the same title.
+- **Which files.** MP3 (ID3v2.2, 2.3 and 2.4: USLT, SYLT and TXXX frames), FLAC, Ogg Vorbis and Opus (Vorbis comments: LYRICS, UNSYNCEDLYRICS, SYNCEDLYRICS), and M4A/MP4 (the `©lyr` atom). A file with several lyrics in it shows the most synced one.
+- **Order.** It comes after a TTML you uploaded for the song yourself and a source you pinned, and before any lookup. The credit line reads "Provided by: the song's own tags".
+- **Code.** `utils/LocalEmbed/`: `Tags.ts` (reads the tags, no library), `EmbeddedLyrics.ts` (what the text becomes), `Library.ts` (reading a folder, keeping and finding lyrics), hooked in `fetchLyrics.ts`. The panel is `SettingsPanel/LocalLyricsTools.tsx`.
+
+**TTML to Enhanced LRC Converter.** Choose TTML files of your own (or paste one) and get LRC text: enhanced LRC for word-timed TTML, plain LRC for line-timed, plain lines for untimed. Download or copy it, put it in a song's lyrics tag with a tag editor, then read the folder again above. A backing vocal becomes a line of its own in brackets; **Centiseconds** (`[00:12.34]`) works in the most players, **Milliseconds** (`[00:12.345]`) is more exact. A pause between two words is written as a closing time tag, so the converted text reads back with the same timings (checked on a real word-timed TTML to within one rounding step). Everything happens on your PC. Code: `utils/LocalEmbed/TtmlToLrc.ts`.
 ## Local files and podcasts (experiment)
 
 Settings → Experiments → **Lyrics for Local Files & Podcasts** (off by default). When on,

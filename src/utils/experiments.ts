@@ -46,6 +46,8 @@ export type Experiment = {
   slider?: { label: string; description?: string; min: number; max: number; step: number; default: number; unit?: string };
   /** One extra on/off choice, persisted as `experimentOption:<id>` and shown while the experiment is on. */
   toggle?: { label: string; description?: string; default: boolean };
+  /** A panel of its own shown under the switch while the experiment is on (see LocalLyricsTools.tsx). */
+  tool?: "embeddedLyrics" | "ttmlToLrc";
 };
 
 export const EXPERIMENTS = [
@@ -129,6 +131,22 @@ export const EXPERIMENTS = [
         "For songs Spotify plays as a music video: put the video itself in the background instead of in the cover. The cover then shows the song's normal cover, or its animated Canvas or Apple Music cover when it has one. (Spotify's video cannot be copied, so it can only be in one place at a time.) Needs Video Songs on.",
       default: false,
     },
+  },
+  {
+    id: "embeddedLocalLyrics",
+    label: "Embedded Lyrics for Local Files",
+    description:
+      "Shows the lyrics stored inside your local music files (their tags) when you play them, and shows them as synced as they are: word by word for enhanced LRC, line by line for LRC, or unsynced for plain text. Spotify's page cannot open your files by itself, so choose your music folder once below; the tags are read on your PC and nothing is uploaded. Works for MP3, FLAC, M4A/MP4 and Ogg files. Disable to stop using them.",
+    default: false,
+    tool: "embeddedLyrics",
+  },
+  {
+    id: "ttmlToLrc",
+    label: "TTML to Enhanced LRC Converter",
+    description:
+      "Turns a TTML lyrics file of your own into LRC text (enhanced LRC when it is word-timed) that you can put in a song's lyrics tag with a tag editor, for use with Embedded Lyrics for Local Files. Everything happens on your PC. Disable to hide the converter.",
+    default: false,
+    tool: "ttmlToLrc",
   },
 ] as const satisfies readonly Experiment[];
 

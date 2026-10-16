@@ -32,7 +32,17 @@ Install [Bun](https://bun.sh) and git, clone this repo, then from its folder in 
 powershell -ExecutionPolicy Bypass -File scripts\install-spicetify.ps1
 ```
 
-This builds the extension, installs it as `spicy-lyrics-hype.providers.js` and restarts Spotify. To update, run `scripts\update-fork.ps1`.
+This builds the extension, installs it as `spicy-lyrics-hype.providers.js` and restarts Spotify. To update, see [Updating](#updating) below.
+
+### Updating
+
+The official Spicy Lyrics loads its code from a server and updates itself. This fork is a self-contained copy inside one file, so it only changes when a new release is published. Each release is the fork with the latest Spicy Lyrics changes already merged in, so **one update covers both**: you do not update Spicy Lyrics separately (and you must not install the official one next to it).
+
+- **Downloaded the file (Option 1):** download `spicy-lyrics-hype.providers.js` from the [latest release](../../releases/latest), put it over the old one in Spicetify's `Extensions` folder, and run `spicetify apply`. Spotify restarts. Your settings are stored by Spotify, not in the file, so they normally stay.
+- **Built it yourself (Option 2):** from the cloned folder run `git pull`, then `powershell -ExecutionPolicy Bypass -File scripts\install-spicetify.ps1`. (`scripts\update-fork.ps1` is for the person who maintains the fork: it pulls Spicy Lyrics' own changes into the code before a release is made. You do not need it.)
+- **Coming from v1.0.0:** see the note under Option 1 about the old file name.
+
+If lyrics from Spicy Lyrics' own service stop loading, the service may be refusing an old version: install the newest release.
 
 For the Worker setup that Genius and YouTube Music need, macOS and Linux, settings, and troubleshooting, read [RUNBOOK.md](./RUNBOOK.md).
 

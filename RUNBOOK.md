@@ -10,7 +10,7 @@ provider fallback and a "Prefer Best Sync" mode, plus line meanings, Gemini tran
 |---|---|---|
 | Spicetify file | `spicy-lyrics.mjs` (a ~100 byte loader) | `spicy-lyrics-hype.providers.js` (full 1.4 MB build) |
 | Where the code lives | Downloaded from a CDN on every start, so upstream updates reach you instantly | Inside the file. Changes only when you rebuild |
-| Updates | Automatic | Manual: `scripts/update-fork.ps1` |
+| Updates | Automatic | Manual: install the file from a new release, or `git pull` then `scripts/install-spicetify.ps1`. (`scripts/update-fork.ps1` pulls Spicy Lyrics' own changes into the code before a release: it is for whoever maintains the fork.) |
 
 Settings are stored under the same Spotify key (`SL:settings`), so your existing Spicy
 Lyrics settings carry over, and the new ones (`lyricsProvider`, `lyricsProviderFallback`,

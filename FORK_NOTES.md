@@ -43,8 +43,7 @@ The fork adds, on top of upstream:
   pastes in chat (Genius credentials, Musixmatch tokens). Don't circumvent anyone's access controls (Musixmatch
   stays "needs your own token", no impersonating official apps). Leave the user's Spotify settings exactly as found
   after tests.
-- Unpushed local commits at the time of writing: everything after `30bb2a6` (the upstream merge), 11 commits, newest
-  `1a34f22`.
+- Push state: everything is pushed (checked 2026-10-17: `main` equals `origin/main`). Tag `v1.0.4` is the upstream merge `7b4bfd4`; later commits are docs only (the README Updating section).
 
 ## 3. Code map (src/)
 

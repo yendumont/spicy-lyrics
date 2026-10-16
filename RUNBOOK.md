@@ -1,7 +1,7 @@
 # Runbook: running this fork next to (or instead of) official Spicy Lyrics
 
 This fork adds about 15 lyrics providers (lrc.red, LRCLIB, Unison, LRCMux, NetEase, QQ Music, Genius, Musixmatch, AMLL TTML DB, KuGou, Deezer, Kuwo, YouTube Music, BiniLyrics), an adjustable provider priority list,
-provider fallback and a "Prefer Best Sync" mode, plus line meanings, Gemini translation, animated covers and Canvas, and lyrics for local files and podcasts. Each feature has its own section below. It installs into Spicetify as its **own extension**,
+provider fallback and a "Prefer Best Sync" mode, plus line meanings, Gemini translation, animated covers, and lyrics for local files and podcasts. Each feature has its own section below. It installs into Spicetify as its **own extension**,
 `spicy-lyrics-hype.providers.js`, so official Spicy Lyrics updates cannot overwrite it.
 
 ## Why it is separate
@@ -299,27 +299,19 @@ no animated cover, so nothing changes for them.
 - It pauses with the music and when Spotify is hidden. Turning the experiment off removes
   the video straight away.
 
-### Spotify Canvas and the live background (two more experiments)
+### The live background (experiment)
 
-Settings, Experiments (both off by default):
+Settings, Experiments (off by default). Spotify Canvases are handled by Spicy Lyrics' own **Canvas
+Stage** and **Canvas NPV Background** experiments (upstream); this fork no longer has its own.
 
-- **Spotify Canvas as Animated Cover.** A song's Canvas (the short looping video artists add)
-  plays over the still cover the same way. Spotify already hands the extension its address
-  (the playing track's `canvas.url`), and the file can be fetched directly, so **no Worker
-  change is needed**. It is H.264 too, so it is converted once like Apple's (a few seconds,
-  split over several cores), kept in the same cache, and then instant. A Canvas is tall
-  (9:16): it keeps its shape and the cover box crops it to a square. Where a song has both,
-  Apple's cover stays on the cover and the Canvas goes to the live background; a song with only
-  a Canvas shows it on the cover. Most popular songs have a Canvas, far more than have an Apple cover.
-- **Live Video Background.** The same video fills the background of Fullscreen and the
-  larger view, darkened and blurred behind the lyrics; the normal animated background stays
-  underneath and shows for songs with no video. It tries both sources by itself, so it works
-  without the two cover experiments being on. **Background Blur** (0 to 60 px, default 24)
-  appears under it while it is on, and changes straight away.
-- **Keep Video Aspect Ratio** (a separate experiment, off by default) shows these videos whole
-  instead of cropping them to fill: a tall Canvas sits entire in the cover (the still cover shows
-  at its sides) and the background video is not zoomed to the window (the normal background
-  shows around it).
+- **Live Video Background.** The album's animated cover from Apple Music fills the background of
+  Fullscreen and the larger view, darkened and blurred behind the lyrics; the normal animated
+  background stays underneath and shows for songs with no animated cover. It works without
+  **Animated Album Covers** being on. **Background Blur** (0 to 60 px, default 24) appears under
+  it while it is on, and changes straight away.
+- **Keep Video Aspect Ratio** (a separate experiment, off by default) shows the animated covers
+  and the background video in their own shape instead of cropping them to fill (the normal
+  background shows around a background video).
 ### Video songs (experiment, on by default)
 
 Settings, Experiments, **Video Songs**. Songs Spotify plays as a music video used to show
@@ -340,8 +332,8 @@ often still have it).
 
 With **Live Video Background** on, its extra switch **Video Songs in the Background** puts the
 video itself in the blurred background instead of the cover (Spotify's video cannot be in two
-places at once). The cover then shows the song's normal album cover, or its animated Canvas or
-Apple Music cover if it has one.
+places at once). The cover then shows the song's normal album cover, or its Apple Music
+animated cover if it has one.
 ## Genius fallback (optional)
 
 Genius is a provider in the **Lyrics Provider Priority** list, last in the default order. With

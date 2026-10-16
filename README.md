@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > **This is an unofficial fork** of [Spikerko/spicy-lyrics](https://github.com/Spikerko/spicy-lyrics). It is not made or supported by the Spicy Lyrics team. This section is about the fork; the original project's README follows the line below.
 
-**What it adds:** about 15 lyrics sources with a priority list and per-song pinning, Genius line meanings, Gemini translation (including word-synced translation), animated album covers, Spotify Canvas and a live video background, lyrics for local files and podcasts (including lyrics stored in a file's own tags), and a TTML to enhanced LRC converter. The full list is in [RUNBOOK.md](./RUNBOOK.md).
+**What it adds:** about 15 lyrics sources with a priority list and per-song pinning, Genius line meanings, Gemini translation (including word-synced translation), animated album covers and a live video background, lyrics for local files and podcasts (including lyrics stored in a file's own tags), and a TTML to enhanced LRC converter. The full list is in [RUNBOOK.md](./RUNBOOK.md).
 
 ## Installing the fork
 

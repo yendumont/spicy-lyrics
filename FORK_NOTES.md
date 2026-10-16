@@ -24,7 +24,7 @@ The fork adds, on top of upstream:
 - **Line meanings** from Genius annotations (setting `lineMeaningsFrom`: artist / artist+editors / everyone).
 - **Gemini translation** with the user's own key (`geminiApiKey`, `translateLyrics`, `translationLanguage`).
 - Experiment **Animated Album Covers** (`animatedCover`): Apple Music motion art -> WebM via ffmpeg.wasm.
-- Experiments **Spotify Canvas as Animated Cover** (`spotifyCanvas`) and **Live Video Background** (`liveBackground`, with a blur slider): see "Canvas and live background" below.
+- Experiment **Live Video Background** (`liveBackground`, with a blur slider): see "Live background" below. Spotify Canvas is upstream's Canvas Stage.
 - A **Cloudflare Worker** (`workers/genius-proxy/worker.js`) for everything the Spotify page can't fetch itself.
 
 ## 2. Environment and workflow (Windows)
@@ -124,21 +124,15 @@ Hard-won facts:
 - Speed (`Transcode.ts`): conversion was single-threaded (~20 s). It now splits the clip into up to 4 pieces, converts each in its own
   ffmpeg.wasm, and joins them with the concat demuxer (`-c copy`): ~6 s, about 8 s from song start. Falls back to one piece if that fails.
   Timings and findings came from the debug port; the Spotify GraphQL helper only works on a fresh Spotify start (not after a page reload).
-### Canvas and live background (utils/AnimatedCover/)
+### Live background (utils/AnimatedCover/)
 
-- `Canvas.ts`: the playing track's Canvas is in player metadata as flat dotted keys, `Spicetify.Player.data.item.metadata["canvas.url"]`
-  (also `canvas.type` VIDEO_*, `canvas.id`). It is H.264 MP4 on canvaz.scdn.co, fetchable with plain `fetch` (CORS ok), not playable
-  (error code 4) so `Transcode.ts:transcodeCanvas` converts it (`scale=540:-2`, keeps 9:16; duration read from the MP4 `mvhd` box, pieces of >=2 s).
-  Metadata appears a moment after a song change, so `findCanvas` polls up to 1.5 s.
-- `Motion.ts`: `getMotion({apple, canvas}, isCurrent, prefer)` returns the preferred source first: the cover passes `"apple"` (Apple's square cover stays on the cover) and the live background the default `"canvas"`, so a song with both shows both; a song with one shows it in both places; `loopVideo`/`dropVideo`/`pauseOrResumeAll` are shared by both displays.
-  `AnimatedCover.ts:memoVideo(key, produce)` is the shared memory+Cache Storage layer (`/video/<key>`, max 40, keys `canvas-<id>` or the Apple hash).
-- `index.ts` = the cover (needs `animatedCover` and/or `spotifyCanvas`); `LiveBackground.ts` = a `<video class="LiveBackgroundVideo">` appended to `.ContentBox`
+Spotify Canvas is upstream's now (Canvas Stage, `components/DynamicBG/CanvasImmersive.ts`); the fork's own Canvas code and the `spotifyCanvas` experiment were removed in the 6.4.0 merge.
+
+- `Motion.ts`: `getMotion({apple}, isCurrent)` finds the album's Apple animated cover; `loopVideo`/`dropVideo`/`pauseOrResumeAll` are shared by the cover and the background.
+  `AnimatedCover.ts:memoVideo(key, produce)` is the shared memory+Cache Storage layer (`/video/<key>`, max 40, the Apple hash).
+- `index.ts` = the cover (needs `animatedCover`); `LiveBackground.ts` = a `<video class="LiveBackgroundVideo">` appended to `.ContentBox`
   at z-index 1 (above the `.spicy-dynamic-bg` canvas, below lyrics z 4), CSS in `css/Lyrics/Extras.css`, blur via `--LiveBackgroundBlur` (set on the page and root, like the static background blur).
-  It always tries both sources, independent of the cover experiments.
-- Experiments can now carry one `slider` (see the header of `utils/experiments.ts`; `$experimentSlider(id)`, persisted as `experimentValue:<id>`), shown in the Experiments panel while on.
-- Verified in Spotify via the debug port: Levitating/Espresso/Disease/Paint The Town Red Canvases convert in about 2-6 s and show on the cover and background at 540x960;
-  the slider changes the blur live; settings restored afterwards. The Apple-fallback branch of `getMotion` was not re-tested (it is unchanged logic) because nearly every
-  test song had a Canvas.
+- Experiments can carry one `slider` and one `toggle` (see the header of `utils/experiments.ts`; `$experimentSlider(id)`, `$experimentToggle(id)`, persisted as `experimentValue:<id>` / `experimentOption:<id>`) and a `tool` panel; `ExperimentsPanel.tsx` shows them under the row while the experiment is on.
 ### Video songs (`videoSongs` experiment, default on)
 
 - Tracks Spotify plays as music videos have `Player.data.item.mediaType === "video"` (still `type: "track"`, normal track URI). `fetchLyrics.ts` used to stop them
@@ -189,3 +183,5 @@ passed. The Genius embed fix was verified at the Worker level only; confirm end 
 
 Match surrounding code: comment *why*, not *what*; header comments on modules that explain contracts (see
 `registry.ts`, `experiments.ts`, `worker.js`); no unrelated refactors; both states of an experiment must work.
+
+- Settings panel: upstream's tabbed panel is built from SettingDef/SectionDef (SettingsPanel/model.ts). The fork's provider, Genius and translation settings live in SettingsPanel/ProviderSettings.tsx and are appended to the Lyrics tab with one line in LyricsSection.tsx, so upstream changes to that file rarely conflict. Experiment extras (slider, toggle, tool) render in ExperimentsPanel.tsx.

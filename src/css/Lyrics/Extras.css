@@ -194,11 +194,6 @@
 #SpicyLyricsPage .MediaImageContainer .AnimatedCoverVideo.Ready {
   opacity: 1;
 }
-/* A Canvas is tall: crop it to the cover's shape, keeping the middle a little high where faces are. */
-#SpicyLyricsPage .MediaImageContainer .AnimatedCoverVideo[data-kind="canvas"] {
-  object-position: 50% 38%;
-}
-
 /* ── Live video background (experiment) ─────────────────────────────────────── */
 /* A layer above the normal animated background (which stays underneath as the fallback), below the lyrics. */
 #SpicyLyricsPage .LiveBackgroundVideo {

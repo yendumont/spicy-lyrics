@@ -6,8 +6,8 @@ import { heldMode, onHeldChange } from "../VideoSongs.ts";
 import { dropVideo, getMotion, loopVideo } from "./Motion.ts";
 
 /**
- * The live background: the song's moving picture (its Spotify Canvas, else its album's
- * animated cover from Apple Music) filling the background of Fullscreen and the larger view,
+ * The live background: the song's moving picture (its album's animated cover from Apple
+ * Music) filling the background of Fullscreen and the larger view,
  * darkened and blurred behind the lyrics. It is a layer above the normal animated background,
  * which stays underneath, so a song with no video, or a video still being made, looks as it
  * always did. The picture is cropped to fill whatever shape the window has.
@@ -37,8 +37,8 @@ async function syncLiveBackground(): Promise<void> {
   if (attached?.signature === signature && attached.video.isConnected && content.contains(attached.video)) return;
   detach();
 
-  // Both sources are tried: the background does not depend on the cover experiments being on.
-  const motion = await getMotion({ apple: true, canvas: true }, () => mine === generation);
+  // The background does not depend on the Animated Album Covers experiment being on.
+  const motion = await getMotion({ apple: true }, () => mine === generation);
   if (mine !== generation || !motion) return;
   const live = PageContainer?.querySelector<HTMLElement>(CONTENT);
   if (!live?.isConnected) return;

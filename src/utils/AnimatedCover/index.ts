@@ -8,10 +8,9 @@ import { dropVideo, getMotion, loopVideo, pauseOrResumeAll } from "./Motion.ts";
 import { initLiveBackground } from "./LiveBackground.ts";
 
 /**
- * Plays the song's animated cover (its album's animated cover from Apple Music, or else its
- * Spotify Canvas) over the still cover in the Now Bar (the cover in Fullscreen and in the larger
- * view). The still cover stays underneath, so nothing changes while the video is made or if
- * the song has none. A Canvas is tall, so the box crops it to the cover's shape.
+ * Plays the song's animated cover (its album's animated cover from Apple Music) over the still
+ * cover in the Now Bar (the cover in Fullscreen and in the larger view). The still cover stays
+ * underneath, so nothing changes while the video is made or if the song has none.
  */
 const CONTAINER = ".ContentBox .NowBar .Header .MediaBox .MediaImageContainer";
 
@@ -29,22 +28,21 @@ function detach(): void {
 export async function syncAnimatedCover(): Promise<void> {
   const mine = ++generation;
   const container = PageContainer?.querySelector<HTMLElement>(CONTAINER);
-  const use = { apple: isExperimentEnabled("animatedCover"), canvas: isExperimentEnabled("spotifyCanvas") };
+  const use = { apple: isExperimentEnabled("animatedCover") };
 
   // A video song shows its own video in the cover instead (see VideoSongs.ts), unless that is sent to the background.
-  if ((!use.apple && !use.canvas) || !container?.isConnected || !nowBarShown() || heldMode() === "cover") {
+  if (!use.apple || !container?.isConnected || !nowBarShown() || heldMode() === "cover") {
     detach();
     return;
   }
 
   // What is wanted: this song, with these sources. If that is already showing, there is nothing to do.
-  const signature = `${SpotifyPlayer.GetUri()}|${use.apple}|${use.canvas}`;
+  const signature = `${SpotifyPlayer.GetUri()}|${use.apple}`;
   if (attached?.signature === signature && attached.video.isConnected && container.contains(attached.video)) return;
   detach();
 
   // The song may change, or the cover be closed, while the video is being made.
-  // The cover prefers Apple's album cover and leaves the Canvas to the background (see Motion.ts).
-  const motion = await getMotion(use, () => mine === generation, "apple");
+  const motion = await getMotion(use, () => mine === generation);
   if (mine !== generation || !motion) return;
   const live = PageContainer?.querySelector<HTMLElement>(CONTAINER);
   if (!live?.isConnected) return;
@@ -72,7 +70,7 @@ export function initAnimatedCover(): void {
   onNowBarShownChange(() => void syncAnimatedCover());
   onHeldChange(() => void syncAnimatedCover());
   onExperimentChange((experiment) => {
-    if (experiment.id === "animatedCover" || experiment.id === "spotifyCanvas") void syncAnimatedCover();
+    if (experiment.id === "animatedCover") void syncAnimatedCover();
   });
 
   Global.Event.listen("playback:playpause", pauseOrResumeAll);

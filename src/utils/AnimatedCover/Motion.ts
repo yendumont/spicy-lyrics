@@ -1,25 +1,14 @@
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import { ResolveTrack } from "../Lyrics/providers/Resolve.ts";
 import { getAnimatedCover } from "./AnimatedCover.ts";
-import { findCanvas, getCanvasVideo } from "./Canvas.ts";
 
 /**
  * Where the playing song's moving picture comes from, for everything that shows one (the
- * animated cover and the live background): its Spotify Canvas (made for that song, quick to
- * get) or its album's animated cover from Apple Music. `prefer` says which wins when a song has
- * both: the cover takes Apple's (a square, made for an album cover) and the background takes
- * the Canvas (a full-screen picture), so a song with both shows both. A song with only one
- * shows it in both places.
+ * animated cover and the live background): its album's animated cover from Apple Music.
+ * Spotify Canvases are not handled here: Spicy Lyrics' own Canvas Stage plays those.
  */
-export type MotionUse = { apple: boolean; canvas: boolean };
-export type Motion = { url: string; kind: "canvas" | "apple" };
-
-async function canvasMotion(isCurrent: () => boolean): Promise<Motion | null> {
-  const canvas = await findCanvas(SpotifyPlayer.GetUri());
-  if (!isCurrent() || !canvas) return null;
-  const url = await getCanvasVideo(canvas);
-  return url ? { url, kind: "canvas" } : null;
-}
+export type MotionUse = { apple: boolean };
+export type Motion = { url: string; kind: "apple" };
 
 async function appleMotion(isCurrent: () => boolean): Promise<Motion | null> {
   const resolved = await ResolveTrack();
@@ -35,19 +24,10 @@ async function appleMotion(isCurrent: () => boolean): Promise<Motion | null> {
 }
 
 /** `isCurrent` says whether the answer is still wanted (the song may change while it is made). */
-export async function getMotion(
-  use: MotionUse,
-  isCurrent: () => boolean,
-  prefer: "canvas" | "apple" = "canvas"
-): Promise<Motion | null> {
-  const order = prefer === "apple" ? (["apple", "canvas"] as const) : (["canvas", "apple"] as const);
-  for (const source of order) {
-    if (!use[source]) continue;
-    const found = await (source === "canvas" ? canvasMotion(isCurrent) : appleMotion(isCurrent));
-    if (!isCurrent()) return null;
-    if (found) return found;
-  }
-  return null;
+export async function getMotion(use: MotionUse, isCurrent: () => boolean): Promise<Motion | null> {
+  if (!use.apple) return null;
+  const found = await appleMotion(isCurrent);
+  return isCurrent() ? found : null;
 }
 
 /** Every video currently on screen, so they can all be paused together. */

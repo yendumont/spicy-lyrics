@@ -190,3 +190,6 @@ Match surrounding code: comment *why*, not *what*; header comments on modules th
 - Recommended GitHub settings for this repo (Settings > Advanced Security): private vulnerability reporting, dependency graph, Dependabot alerts and security updates, secret protection with push protection. Leave Dependabot version updates and CodeQL off (nobody to triage them).
 - Releases: the built file `spicy-lyrics-hype.providers.js` must be attached to each release (users download it); `v1.0.4` is the latest (Spicy Lyrics 6.4.10).
 - The companion Windows app, Lyrics Viewer (#Hype), lives in its own repo (`yendumont/lyric-viewer`); its handover notes are in that repo's `docs/ARCHITECTURE.md` and `MAINTENANCE.md`.
+
+## CodeQL tidy (2026-10-17)
+`scripts/dev/cdp.ts` now matches the Spotify tab by an anchored regex, and `workers/genius-proxy/worker.js` returns fixed generic error texts (no upstream message). Two CodeQL alerts remain in upstream Spicy Lyrics code (`PopupLyrics.ts` font URL check, `Global.ts` object helper); they are false positives to dismiss on GitHub, not to patch (merges from upstream would overwrite a patch).

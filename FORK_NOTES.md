@@ -184,3 +184,9 @@ Match surrounding code: comment *why*, not *what*; header comments on modules th
 `registry.ts`, `experiments.ts`, `worker.js`); no unrelated refactors; both states of an experiment must work.
 
 - Settings panel: upstream's tabbed panel is built from SettingDef/SectionDef (SettingsPanel/model.ts). The fork's provider, Genius and translation settings live in SettingsPanel/ProviderSettings.tsx and are appended to the Lyrics tab with one line in LyricsSection.tsx, so upstream changes to that file rarely conflict. Experiment extras (slider, toggle, tool) render in ExperimentsPanel.tsx.
+
+## Repository settings and policies (2026-10-17)
+- `SECURITY.md` is Spicy Lyrics' own policy with a short note on top saying this is an unofficial fork: report problems in the fork's code privately through GitHub's *Report a vulnerability* on this repo; report Spicy Lyrics' own problems upstream. Keep that note when merging upstream (`scripts\update-fork.ps1` can conflict on this file: keep both).
+- Recommended GitHub settings for this repo (Settings > Advanced Security): private vulnerability reporting, dependency graph, Dependabot alerts and security updates, secret protection with push protection. Leave Dependabot version updates and CodeQL off (nobody to triage them).
+- Releases: the built file `spicy-lyrics-hype.providers.js` must be attached to each release (users download it); `v1.0.4` is the latest (Spicy Lyrics 6.4.10).
+- The companion Windows app, Lyrics Viewer (#Hype), lives in its own repo (`yendumont/lyric-viewer`); its handover notes are in that repo's `docs/ARCHITECTURE.md` and `MAINTENANCE.md`.

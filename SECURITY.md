@@ -1,5 +1,9 @@
 # Spicy Lyrics - Security Policy
 
+> **This repository is an unofficial fork** (SpicyLyrics (#Hype)). To report a problem **in this fork's own code**, use GitHub's **Report a vulnerability** on this
+> repository's **Security** tab (private). Problems in **Spicy Lyrics itself**, its website or its services should be reported to the original project using the
+> policy below. The fork owner can only fix what is in this repository.
+
 ## Reporting a Vulnerability
 
 If you believe you have discovered a security vulnerability affecting

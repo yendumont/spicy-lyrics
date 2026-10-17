@@ -276,7 +276,7 @@ export default {
         if (!VIDEO_ID.test(videoId)) return reply({ error: "bad video id" }, 400);
         return reply(await ytmLyrics(videoId), 200, { "Cache-Control": "public, max-age=3600" });
       } catch (error) {
-        return reply({ error: String(error?.message ?? error) }, 502);
+        return reply({ error: "the upstream request failed" }, 502);
       }
     }
 
@@ -316,7 +316,7 @@ export default {
         try {
           return reply(await appleMotionById(id), 200, { "Cache-Control": "public, max-age=3600" });
         } catch (error) {
-          return reply({ error: String(error?.message ?? error) }, 502);
+          return reply({ error: "the upstream request failed" }, 502);
         }
       }
       const artist = (url.searchParams.get("artist") ?? "").trim();
@@ -327,7 +327,7 @@ export default {
       try {
         return reply(await appleMotion(artist, album), 200, { "Cache-Control": "public, max-age=3600" });
       } catch (error) {
-        return reply({ error: String(error?.message ?? error) }, 502);
+        return reply({ error: "the upstream request failed" }, 502);
       }
     }
 
@@ -337,7 +337,7 @@ export default {
       try {
         return reply(await geniusMeanings(songId), 200, { "Cache-Control": "public, max-age=3600" });
       } catch (error) {
-        return reply({ error: String(error?.message ?? error) }, 502);
+        return reply({ error: "the upstream request failed" }, 502);
       }
     }
 
@@ -402,7 +402,7 @@ export default {
         next = resolved.href;
       }
     } catch (e) {
-      return reply({ error: `could not reach genius: ${String(e?.message ?? e).slice(0, 120)}` }, 502);
+      return reply({ error: `could not reach genius` }, 502);
     }
 
     if (!upstream.ok) return reply({ error: `genius responded ${upstream.status}` }, 502);

@@ -1,5 +1,5 @@
 const targets:any[] = await (await fetch("http://127.0.0.1:8088/json")).json();
-const t = targets.find(x => x.url?.includes("xpui.app.spotify.com"));
+const t = targets.find(x => /^https:\/\/xpui\.app\.spotify\.com\//.test(x.url ?? ""));
 const ws = new WebSocket(t.webSocketDebuggerUrl);
 const expr = await Bun.file(process.argv[2]).text();
 await new Promise(r => ws.onopen = r);
